@@ -1,121 +1,182 @@
-# CCBGit - 超级 Git 仓库网站
-
-双端 Node.js 全栈 Git 仓库管理网站。
-
-## 功能特性
-
-- 📁 仓库列表浏览
-- 🌳 文件树浏览（支持目录展开/折叠）
-- 📝 文件内容查看（语法高亮行号）
-- 📜 提交历史分页加载
-- 🔍 提交详情与差异对比
-- 🌿 分支切换
-- 🏷️ 标签查看
-- 🎨 现代化深色主题 UI
-- ⚡ 实时 Socket.io 连接
-
-## 技术栈
-
-**后端:**
-- Express.js + TypeScript
-- simple-git (Git 操作)
-- Socket.io (实时通信)
-
-**前端:**
-- React 18 + TypeScript
-- Vite (构建工具)
-- React Router v6 (路由)
-- 原生 CSS (无依赖 UI 库)
-
-## 快速开始
-
-### 1. 安装依赖
-
-```bash
-npm run install:all
-```
-
-### 2. 准备 Git 仓库
-
-在项目根目录创建 `repos` 文件夹，并放入你的 Git 仓库：
-
-```bash
-mkdir -p repos
-cd repos
-git clone --bare https://github.com/your/repo.git
-# 或直接放入现有的裸仓库
-```
-
-### 3. 启动开发环境
-
-```bash
-npm run dev
-```
-
-这将同时启动：
-- 前端: http://localhost:3000
-- 后端: http://localhost:3001
-
-### 4. 生产构建
-
-```bash
-npm run build
-npm run start
-```
-
-## 环境变量
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `REPOS_ROOT` | `../../../repos` | Git 仓库根目录路径 |
-| `PORT` | `3001` | 后端服务端口 |
-
-## 项目结构
-
-```
-CCBGit/
-├── package.json              # 根配置 (monorepo)
-├── packages/
-│   ├── server/               # 后端
-│   │   ├── src/
-│   │   │   └── index.ts      # Express + Socket.io 服务
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   └── client/               # 前端
-│       ├── src/
-│       │   ├── components/   # 通用组件
-│       │   ├── pages/        # 页面组件
-│       │   ├── api/          # API 客户端
-│       │   ├── types/        # TypeScript 类型
-│       │   ├── utils/        # 工具函数
-│       │   ├── styles/       # 全局样式
-│       │   ├── App.tsx       # 主应用
-│       │   └── main.tsx      # 入口
-│       ├── index.html
-│       ├── package.json
-│       ├── tsconfig.json
-│       └── vite.config.ts
-└── repos/                    # Git 仓库目录 (需手动创建)
-```
-
-## API 接口
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/health` | 健康检查 |
-| GET | `/api/repos` | 仓库列表 |
-| GET | `/api/repos/:name/info` | 仓库信息 |
-| GET | `/api/repos/:name/tree` | 文件树 |
-| GET | `/api/repos/:name/blob` | 文件内容 |
-| GET | `/api/repos/:name/commits` | 提交列表 |
-| GET | `/api/repos/:name/commit/:hash` | 提交详情 |
-| GET | `/api/repos/:name/diff` | 差异对比 |
-| GET | `/api/repos/:name/branches` | 分支列表 |
-| GET | `/api/repos/:name/tags` | 标签列表 |
-
-## 许可证
-
-MIT# CCBGit
 # CCBGit
-# CCBGit
-# CCBGit
+
+A self-hosted git repository website, built with Node.js at both ends: an
+Express server renders the pages with EJS and serves a JSON API; the browser
+gets a small, dependency-free layer of JavaScript for the parts that should not
+wait for a round trip.
+
+It reads the repositories already on your disk. It does not manage them, and it
+does not need a database.
+
+```
+┌── browser ────────────┐        ┌── node server ──────────┐        ┌── git ──┐
+│  theme, file sizes,   │  HTTP  │  EJS views              │  argv  │  one    │
+│  copy buttons,        │ ─────► │  JSON API               │ ─────► │  process│
+│  branch switcher      │        │  TTL cache              │        │  per    │
+└───────────────────────┘        └─────────────────────────┘        │  query  │
+                                                                └─────────┘
+```
+
+## Quick start
+
+```bash
+npm install
+npm run seed     # creates three sample repositories under ./repos
+npm start        # http://localhost:6600
+```
+
+`npm run dev` does the same with `--watch` for auto-restart.
+
+## Features
+
+**Browse**
+
+- Repository index with search, language filter, and sorting by last update,
+  name, commit count, size or creation date
+- File tree, with directory history and file sizes
+- Blob view with server-side syntax highlighting, a line-number gutter and
+  `#L42` line anchors
+- Markdown files rendered to HTML, with a table of contents for long documents
+- Raw file download and `tar.gz` / `zip` archive of any ref
+
+**History**
+
+- Commit list, optionally scoped to a single path
+- Commit detail with a per-file diff, +/- counts, and collapse/expand
+- Branch, tag and remote-ref switcher that keeps you on the same file
+- Compare any two refs (`/compare/main...feature/x`)
+
+**Search**
+
+- `git grep` across the tree of a ref, literal or regex, with matches marked
+- `/` focuses the search box
+
+**Everywhere**
+
+- Light / dark / follow-system themes, remembered in `localStorage`
+- Responsive layout, keyboard accessible, `prefers-reduced-motion` respected
+- Language statistics per repository
+- Contributor list with per-person commit counts
+
+## Configuration
+
+Everything is environment driven, with defaults that work out of the box. See
+[`.env.example`](.env.example) for the full list; the ones you are most likely
+to touch:
+
+| Variable    | Default        | Meaning                                       |
+| ----------- | -------------- | --------------------------------------------- |
+| `PORT`      | `6600`         | Listen port                                    |
+| `REPO_ROOTS`| `./repos`      | Directories to scan for repositories           |
+| `BASE_URL`  | —              | Public URL, used to build the clone URLs shown |
+| `MAX_BLOB_SIZE` | `2097152`  | Largest file previewed in the browser          |
+
+```bash
+REPO_ROOTS=/srv/git:/home/me/code npm start
+```
+
+A repository is addressed as `<parent-directory>/<name>`, so
+`/srv/git/hello-node` is browsable at `/srv/hello-node`. Repositories are
+discovered up to three directories deep, and a repository is never indexed
+twice — once one is found, the scan does not descend into it.
+
+## HTTP API
+
+Every page has a JSON counterpart under `/api`.
+
+| Method | Path                                     | Returns                              |
+| ------ | ---------------------------------------- | ------------------------------------ |
+| GET    | `/api/repos`                             | repository index (filterable)        |
+| POST   | `/api/repos/refresh`                     | rescan the configured roots          |
+| GET    | `/api/repos/:owner/:name`                | metadata, branches, tags, commits    |
+| GET    | `/api/repos/:owner/:name/refs`           | branches, remotes, tags              |
+| GET    | `/api/repos/:owner/:name/tree?ref=&path=`| directory listing + language stats   |
+| GET    | `/api/repos/:owner/:name/blob?ref=&path=`| file contents and metadata           |
+| GET    | `/api/repos/:owner/:name/commits?ref=`   | paginated commit list                |
+| GET    | `/api/repos/:owner/:name/commits/:sha`   | one commit with its diff             |
+| GET    | `/api/repos/:owner/:name/search?ref=&q=`  | `git grep` results                   |
+| GET    | `/api/repos/:owner/:name/languages?ref=` | language breakdown                   |
+| GET    | `/api/status`                            | versions, cache hit rate, uptime     |
+
+Errors come back as `{ "error": "...", "status": 404 }`.
+
+## Security notes
+
+Repository content is untrusted input, so it is treated that way:
+
+- **git is never given a shell.** Commands run through `execFile`/`spawn` with
+  an argument array, so nothing in a ref or path can be interpreted as shell
+  syntax.
+- **Refs are validated before use.** Anything containing `..`, `^`, `~`, `@{`,
+  a leading `-`, or a colon is rejected outright, which closes off option
+  injection (`--upload-pack=…`) and revision ranges alike.
+- **Paths cannot escape the repository.** Repository-relative paths are split
+  into segments and any `..` is refused; a `NUL` byte is refused too.
+- **Markdown is escaped, not sanitised by pattern-matching.** `marked`'s raw
+  HTML token stream is escaped, so only markup the parser itself produced ever
+  reaches the page. `javascript:` links are dropped and external links get
+  `rel="noopener"`.
+- **Output is escaped at the template boundary.** Views print untrusted strings
+  through an `escapeHtml` helper; the two places that emit pre-rendered HTML use
+  EJS's unescaped `<%-` deliberately and only ever with output from
+  `renderMarkdown` or `highlight`.
+- **A strict CSP** is sent on every response, alongside `nosniff`,
+  `X-Frame-Options` and `Referrer-Policy`.
+
+The test suite asserts these properties directly, including attempts to read
+`/etc/passwd` through path traversal and to smuggle shell options through refs
+and search terms.
+
+Stack traces are hidden from error pages unless `SHOW_STACKS=true`.
+
+## Performance
+
+Git output is cached per repository with a short TTL (`CACHE_TTL`, 15s by
+default) and an LRU bound, keyed by repository and ref. A ref switch, a page
+turn, or a re-render therefore usually costs nothing. `GET /api/status` reports
+the hit rate.
+
+Blob reads are bounded by `MAX_BLOB_SIZE`; anything larger renders as a
+download link rather than being buffered. Archives are streamed from `git
+archive` straight to the socket instead of being held in memory.
+
+## Tests
+
+```bash
+npm test
+```
+
+71 cases across three files, using only `node:test`:
+
+- `test/validate.test.js` — ref, path, and repository-name validation
+- `test/render.test.js` — markdown rendering, XSS, diff parsing
+- `test/server.test.js` — the real app against a throwaway repository built in
+  a temp directory: every page, the whole API, archives, and hostile input
+
+## Layout
+
+```
+config.js              environment-driven configuration
+server/
+  index.js             entry point, graceful shutdown
+  app.js               express app, security headers, error handling
+  lib/
+    git.js             git process wrapper, typed errors
+    repo.js            everything you can do to one repository
+    repos.js           discovery, indexing, search over the registry
+    render.js          markdown, syntax highlighting, escaping
+    validate.js        input validation and HTTP status mapping
+    cache.js           TTL + LRU cache
+    languages.js       language detection and formatting
+  routes/
+    pages.js           HTML routes
+    api.js             JSON routes
+views/                 EJS templates and partials
+public/                stylesheet, client-side JS, favicon
+bin/seed.js            creates the sample repositories
+repos/                 where repositories are looked for (gitignored)
+```
+
+## Requirements
+
+Node.js 20 or newer, and `git` on the `PATH`. No database, no build step.
