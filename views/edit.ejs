@@ -1,0 +1,63 @@
+<%- include('partials/header') %>
+
+<div class="repo-layout">
+  <div class="repo-main wide">
+    <%- include('partials/breadcrumbs', { repo, ref, refEncoded, path: filePath }) %>
+
+    <div class="page-head compact">
+      <h1 class="page-title">
+        <%= mode === 'create' ? 'New file' : `Editing ${h.escapeHtml(file.name)}` %>
+      </h1>
+      <p class="page-sub">
+        in <strong><%= repo.id %></strong> at <strong><%= ref %></strong>
+      </p>
+    </div>
+
+    <% if (!canWrite) { %>
+      <p class="notice warn-notice"><%= h.escapeHtml(reason) %></p>
+      <p class="page-sub">
+        <a href="/<%= repo.id %>/blob/<%= refEncoded %>/<%= h.escapeHtml(filePath) %>">Back to the file</a>
+      </p>
+    <% } else { %>
+
+      <% if (binary) { %>
+        <p class="form-error">This file is binary and cannot be edited here. Replace it by uploading.</p>
+      <% } %>
+
+      <form method="post" action="/<%= repo.id %>/edit/<%= refEncoded %>/<%= h.escapeHtml(filePath) %>" class="form editor-form">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <input type="hidden" name="branch" value="<%= h.escapeHtml(ref) %>">
+
+        <div class="editor-head">
+          <code class="editor-path"><%= h.escapeHtml(filePath) %></code>
+          <span class="editor-meta" data-editor-stats>0 lines</span>
+        </div>
+
+        <textarea name="content" class="editor-content" spellcheck="false"
+                  autocapitalize="none" autocomplete="off"
+                  aria-label="File contents"><%= file.content || '' %></textarea>
+
+        <label class="field">
+          <span>Commit message</span>
+          <input type="text" name="message" required maxlength="500"
+                 value="<%= mode === 'create' ? 'Add ' + h.escapeHtml(filePath) : 'Update ' + h.escapeHtml(filePath) %>"
+                 placeholder="Describe the change">
+        </label>
+
+        <div class="editor-actions">
+          <button class="primary-button" type="submit">
+            <%= mode === 'create' ? 'Commit new file' : 'Commit changes' %>
+          </button>
+          <a class="ghost-button" href="/<%= repo.id %>/blob/<%= refEncoded %>/<%= h.escapeHtml(filePath) %>">Cancel</a>
+          <span class="editor-hint">
+            Tip: <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to commit
+            <% if (file.size) { %> · limit <%= h.formatBytes(maxBytes) %><% } %>
+          </span>
+        </div>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<% pageScript = '/js/editor.js' %>
+<%- include('partials/footer') %>

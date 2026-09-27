@@ -19,6 +19,35 @@ import { NotFoundError } from './validate.js';
 /** The services git may ask for. Anything else is refused. */
 const ALLOWED_SERVICES = new Set(['git-upload-pack', 'git-receive-pack']);
 
+/**
+ * The only paths git is allowed to ask for beneath a repository.
+ *
+ * `PATH_INFO` is attacker-influenced, so it is not sanitised - it is checked
+ * against this list and nothing else gets through.
+ */
+const ALLOWED_SUBPATHS = new Set(['/info/refs', '/git-upload-pack', '/git-receive-pack']);
+
+/**
+ * Build the CGI `PATH_INFO` for a request.
+ *
+ * git-http-backend resolves `PATH_INFO` against `GIT_PROJECT_ROOT`, and it
+ * strips a trailing `.git` itself. So the repository component has to be its
+ * path *relative to the root*: passing `/foo.git/...` for a directory called
+ * `foo` makes the backend look for `foo.git` and answer 404.
+ */
+function buildPathInfo(repoPath, root, subpath) {
+  const relative = path.relative(path.resolve(root), path.resolve(repoPath));
+  const segments = relative.split(path.sep);
+  if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)
+    || segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
+    throw new NotFoundError('invalid repository path');
+  }
+  if (!ALLOWED_SUBPATHS.has(subpath)) {
+    throw new NotFoundError(`unsupported git path: ${subpath}`);
+  }
+  return `/${segments.join('/')}${subpath}`;
+}
+
 /** Locate `git-http-backend`, which ships inside git's exec-path. */
 let backendBinary = null;
 
@@ -62,7 +91,7 @@ export function assertService(service) {
  * single path segment: without those two checks a crafted URL could reach a
  * different repository, or one outside the configured roots entirely.
  */
-export function cgiEnvironment(req, { repoPath, service, remoteUser, protocolVersion }) {
+export function cgiEnvironment(req, { repoPath, subpath, remoteUser, protocolVersion }) {
   const root = path.resolve(config.repoRoots[0]);
   const absolute = path.resolve(repoPath);
   const relative = path.relative(root, absolute);
@@ -70,7 +99,11 @@ export function cgiEnvironment(req, { repoPath, service, remoteUser, protocolVer
   if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new NotFoundError('repository is outside the configured roots');
   }
-  if (relative.split(path.sep).length !== 1) {
+  // Repositories may be nested (repos/group/name), so several segments are fine.
+  // What is not fine is an empty or dotted segment, which is the only way a
+  // relative path could still point somewhere unintended.
+  const segments = relative.split(path.sep);
+  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
     throw new NotFoundError('invalid repository path');
   }
 
@@ -80,7 +113,7 @@ export function cgiEnvironment(req, { repoPath, service, remoteUser, protocolVer
     SERVER_PROTOCOL: `HTTP/${headers['http-version'] || '1.1'}`,
     SERVER_SOFTWARE: 'ccbgit',
     REQUEST_METHOD: req.method,
-    PATH_INFO: `/${relative}`,
+    PATH_INFO: buildPathInfo(absolute, root, subpath),
     PATH_TRANSLATED: absolute,
     SCRIPT_NAME: '',
     QUERY_STRING: req.originalUrl.includes('?') ? req.originalUrl.split('?')[1] : '',
@@ -110,9 +143,9 @@ export function cgiEnvironment(req, { repoPath, service, remoteUser, protocolVer
  * Resolves once the response has been written. Rejects with the backend's
  * stderr if it exits non-zero before sending a response.
  */
-export async function proxyGit(req, res, { repoPath, service, remoteUser, protocolVersion }) {
+export async function proxyGit(req, res, { repoPath, subpath, remoteUser, protocolVersion }) {
   const binary = await findBackend();
-  const env = cgiEnvironment(req, { repoPath, service, remoteUser, protocolVersion });
+  const env = cgiEnvironment(req, { repoPath, subpath, remoteUser, protocolVersion });
 
   return new Promise((resolve, reject) => {
     const child = spawn(binary, [], {
@@ -215,4 +248,4 @@ export async function repositoryExists(repoPath) {
   }
 }
 
-export { ALLOWED_SERVICES };
+export { ALLOWED_SERVICES, ALLOWED_SUBPATHS, buildPathInfo };

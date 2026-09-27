@@ -5,7 +5,7 @@
 
   <div class="repo-main">
     <%- include('partials/breadcrumbs', { repo, ref, refEncoded, path }) %>
-    <%- include('partials/clone', { repo, ref, refEncoded, meta }) %>
+    <%- include('partials/clone', { repo, ref, refEncoded, meta, git, writeAccess }) %>
 
     <% if (meta.latestCommit) { %>
       <div class="commit-strip">
@@ -21,9 +21,9 @@
     <% } %>
 
     <% if (mode === 'blob' && file) { %>
-      <%- include('partials/blob', { file, repo, ref, refEncoded }) %>
+      <%- include('partials/blob', { file, repo, ref, refEncoded, writeAccess, csrf }) %>
     <% } else { %>
-      <%- include('partials/tree', { tree, path, readme, repo, ref, refEncoded }) %>
+      <%- include('partials/tree', { tree, path, readme, repo, ref, refEncoded, writeAccess, csrf }) %>
     <% } %>
 
     <% if (commits && commits.length && mode !== 'commits') { %>

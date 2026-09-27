@@ -1,20 +1,18 @@
 <%#
-  Only advertise commands that actually work. `owner/name.git` is a browse
-  path, not a git endpoint: there is no git HTTP backend here, so `git clone`
-  or `git push` over HTTP would just be redirected to the sign-in form.
-
-  What does work is pushing to the repository's location on disk, and
-  downloading a snapshot of any ref as an archive.
+  The git HTTP endpoints are real, so these URLs work with `git clone` and
+  `git push` once credentials are configured. A push URL is only offered to
+  someone who may actually push: a URL that fails on push is worse than none.
 %>
-<div class="clone-form">
+<div class="clone-form" data-clone>
   <div class="clone-tabs" role="tablist">
-    <span class="clone-tab is-active">Push from your machine</span>
+    <span class="clone-tab is-active">HTTP</span>
   </div>
   <div class="clone-row">
     <input class="clone-input" id="clone-url" readonly spellcheck="false"
-           value="git push <%= h.escapeHtml(meta.cloneUrls.local) %> <%= h.escapeHtml(ref) %>"
-           aria-label="Push command">
-    <button type="button" class="clone-copy" data-copy-target="#clone-url" title="Copy push command">
+           value="<%= h.escapeHtml(git.http) %>"
+           aria-label="Git URL"
+           data-urls='<%= h.json(git.urls) %>'>
+    <button type="button" class="clone-copy" data-copy-target="#clone-url" title="Copy URL">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>
       <span>Copy</span>
     </button>
@@ -23,13 +21,19 @@
       <span class="sr-only">Download tar.gz</span>
     </a>
   </div>
-  <p class="clone-note">
-    This is a repository on disk, not an HTTP git endpoint &mdash; push to the
-    path above, then use <strong>Rescan</strong> on the home page.
-    <% if (!meta.bare) { %>
-      A worktree repository refuses pushes to the branch it has checked out; set
-      <code>receive.denyCurrentBranch=updateInstead</code> first, or make the
-      repository bare with <code>git init --bare</code>.
-    <% } %>
-  </p>
+
+  <% if (writeAccess.canWrite) { %>
+    <p class="clone-note">
+      You can push here. Authenticate once with
+      <code>git config credential.helper store</code>, then
+      <code>git push <%= h.escapeHtml(git.short) %> <%= h.escapeHtml(ref) %></code>.
+    </p>
+  <% } else { %>
+    <p class="clone-note">
+      Read-only for you<% if (writeAccess.owner && !writeAccess.owner.includes(':')) { %>
+        &mdash; owned by <strong><%= h.escapeHtml(writeAccess.owner) %></strong><% } %>.
+      You can still add files from this machine:
+      <code>git push <%= h.escapeHtml(git.path) %> <%= h.escapeHtml(ref) %></code>
+    </p>
+  <% } %>
 </div>

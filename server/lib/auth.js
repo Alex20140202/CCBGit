@@ -308,8 +308,13 @@ export function requireCsrf(req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
 
   // Forms carry the token in a hidden field; fetch() calls carry it in a
-  // header, because there is no form to put a field in.
-  const submitted = (req.body && req.body._csrf) || req.get('X-CSRF-Token');
+  // header. A multipart upload needs a third option, because `express.urlencoded`
+  // does not parse multipart bodies, so its hidden field is never populated -
+  // for those the token is read from the query string, which the form's own
+  // action URL supplies.
+  const submitted = (req.body && req.body._csrf)
+    || req.get('X-CSRF-Token')
+    || (req.query && req.query._csrf);
   const expected = req.session && req.session.csrf;
 
   const reject = () => {

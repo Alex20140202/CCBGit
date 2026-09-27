@@ -56,16 +56,43 @@ function authorEnv(user) {
   };
 }
 
-/** Resolve the ref a change should be based on, defaulting to the main branch. */
+/**
+ * Resolve the ref a change should be based on.
+ *
+ * When the caller named a branch explicitly, that branch is used or the write
+ * fails - falling back to the default would silently put a commit somewhere the
+ * user did not ask for. Only an unnamed request falls back.
+ */
 async function targetRef(repo, requested) {
-  const candidates = [requested, DEFAULT_BRANCH, 'HEAD'].filter(Boolean);
-  for (const candidate of candidates) {
+  if (requested) {
+    const wanted = newRefName(requested);
+    const sha = await gitOut(repo.path, ['rev-parse', '--verify', '--quiet', `${wanted}^{commit}`])
+      .catch(() => '');
+    // A branch that does not exist yet is created by this commit, which is how
+    // a new branch is started from the browser.
+    return { ref: wanted, sha: sha || null };
+  }
+
+  for (const candidate of [DEFAULT_BRANCH, 'HEAD']) {
     try {
+      // eslint-disable-next-line no-await-in-loop
       const sha = await gitOut(repo.path, ['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`]);
-      if (sha) return { ref: candidate, sha };
+      if (!sha) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const full = await gitOut(repo.path, ['rev-parse', '--symbolic-full-name', sha]);
+      return { ref: full || `refs/heads/${candidate}`, sha };
     } catch { /* try the next candidate */ }
   }
   return null;
+}
+
+/** The ref a brand new branch should be created under. */
+function newRefName(requested) {
+  const name = String(requested || DEFAULT_BRANCH).replace(/^refs\/heads\//, '');
+  if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name) || name.includes('..')) {
+    throw new ValidationError(`"${requested}" is not a valid branch name`);
+  }
+  return `refs/heads/${name}`;
 }
 
 /**
@@ -96,11 +123,16 @@ async function commitEdits(repo, { ref, sha, edits, message, user, allowEmpty = 
     }
 
     for (const edit of edits) {
-      const target = safeRepoPath(edit.path);
-      if (!target) throw new ValidationError('a file path is required');
+      // Validated once here so no edit can slip through the plumbing unchecked.
+      const target = writablePath(edit.path);
 
       if (edit.delete) {
-        await run(['update-index', '--force-remove', '--', target], withIndex);
+        // Mode 0000 is how --index-info spells "remove this path". The
+        // --force-remove and --remove flags both insist on a working tree, which
+        // a bare repository does not have - and a bare repository is exactly
+        // what you push to.
+        await run(['update-index', '--index-info'], withIndex,
+          `0 ${'0'.repeat(40)}\t${target}\n`);
         continue;
       }
 
@@ -114,23 +146,23 @@ async function commitEdits(repo, { ref, sha, edits, message, user, allowEmpty = 
         withIndex,
         content,
       );
-      const blob = stdout.trim();
+      const blob = stdout.toString('utf8').trim();
       if (!/^[0-9a-f]{40,64}$/.test(blob)) {
         throw new Error(`could not store ${target} in the object database`);
       }
 
-      // --add is needed for a path that is not in the tree yet.
-      await run(['update-index', '--add', '--cacheinfo', `100644,${blob},${target}`], withIndex);
+      // --index-info both adds and replaces, and works without a working tree.
+      await run(['update-index', '--index-info'], withIndex, `100644 ${blob}\t${target}\n`);
     }
 
     const { stdout: treeOut } = await run(['write-tree'], withIndex);
-    const tree = treeOut.trim();
+    const tree = treeOut.toString('utf8').trim();
 
     if (sha && !allowEmpty) {
       // Catching a no-op here gives a better message than a confusing
       // "nothing to commit" from git after the fact.
       const { stdout: parentTreeOut } = await run(['rev-parse', `${sha}^{tree}`]);
-      if (parentTreeOut.trim() === tree) {
+      if (parentTreeOut.toString('utf8').trim() === tree) {
         throw new ValidationError('nothing to commit: that change would not alter the tree');
       }
     }
@@ -139,7 +171,7 @@ async function commitEdits(repo, { ref, sha, edits, message, user, allowEmpty = 
     const { stdout: commitOut } = await run([
       'commit-tree', tree, ...parentArgs, '-m', message,
     ]);
-    const commit = commitOut.trim();
+    const commit = commitOut.toString('utf8').trim();
 
     // Move the branch. Passing the old value makes this a compare-and-swap, so
     // two people editing at once produces a clear failure rather than one
@@ -160,10 +192,101 @@ function firstLine(text) {
   return String(text).split('\n')[0].slice(0, 60);
 }
 
+/**
+ * Write a set of files in one commit.
+ *
+ * A batch is the natural unit for a multi-file upload: someone dropping in five
+ * files expects one commit in the history, not five.
+ */
+export async function writeFiles(repo, { edits, message, branch, user }) {
+  if (!Array.isArray(edits) || !edits.length) {
+    throw new ValidationError('no files to write');
+  }
+
+  const current = await targetRef(repo, branch);
+  const ref = current ? current.ref : newRefName(branch);
+
+  const normalised = edits.map((edit) => ({ ...edit, path: writablePath(edit.path) }));
+  for (const edit of normalised) {
+    if (!edit.path) throw new ValidationError('a file path is required');
+  }
+
+  // Reject an overwrite of a directory with a file, and vice versa, before
+  // anything is written.
+  if (current) {
+    for (const edit of normalised) {
+      // eslint-disable-next-line no-await-in-loop
+      const clash = await pathClash(repo, current.sha, edit.path);
+      if (clash) throw new ValidationError(clash);
+    }
+  }
+
+  const result = await commitEdits(repo, {
+    ref,
+    sha: current ? current.sha : null,
+    edits: normalised,
+    message,
+    user,
+  });
+
+  return { ...result, paths: normalised.map((edit) => edit.path) };
+}
+
+/**
+ * Would writing `target` collide with something already in the tree?
+ *
+ * Git refuses both directions ("cannot create ... : file exists"), but the
+ * message it produces does not say which file the user typed, so this checks
+ * first and names the path.
+ */
+async function pathClash(repo, sha, target) {
+  const kindOf = async (path) => {
+    try {
+      return await gitOut(repo.path, ['cat-file', '-t', `${sha}:${path}`]);
+    } catch {
+      return null; // does not exist
+    }
+  };
+
+  // A file cannot replace a directory.
+  if (await kindOf(target) === 'tree') {
+    return `${target} is a directory; a file cannot replace it`;
+  }
+
+  // A file cannot be created inside another file.
+  const parent = target.includes('/') ? target.slice(0, target.lastIndexOf('/')) : '';
+  if (parent) {
+    const parentKind = await kindOf(parent);
+    if (parentKind && parentKind !== 'tree') {
+      return `${target} cannot be created: ${parent} is a file, not a directory`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Paths git reserves. Writing to these fails deep inside git with a confusing
+ * error, and `.git` in particular must never be reachable from a web form.
+ */
+const RESERVED_SEGMENTS = new Set(['.git', '.hg', '.svn', '.gitmodules.lock']);
+
+/** A repository-relative path that is safe to write. */
+function writablePath(input) {
+  const target = safeRepoPath(input);
+  if (!target) throw new ValidationError('a file path is required');
+
+  for (const segment of target.split('/')) {
+    if (RESERVED_SEGMENTS.has(segment)) {
+      throw new ValidationError(`"${segment}" is reserved by git and cannot be written to`);
+    }
+  }
+  if (target.endsWith('/')) throw new ValidationError('a file path cannot end with a slash');
+  return target;
+}
+
 /** Create a new file, or replace an existing one. */
 export async function writeFile(repo, { path: filePath, content, message, branch, user }) {
-  const target = safeRepoPath(filePath);
-  if (!target) throw new ValidationError('a file path is required');
+  const target = writablePath(filePath);
 
   const buffer = Buffer.isBuffer(content) ? content : Buffer.from(String(content ?? ''), 'utf8');
   if (buffer.length > MAX_UPLOAD_BYTES) refuseTooLarge(buffer.length);
@@ -171,27 +294,22 @@ export async function writeFile(repo, { path: filePath, content, message, branch
   const current = await targetRef(repo, branch);
   const existed = current ? await fileExists(repo, current.sha, target) : false;
 
-  const ref = current ? current.ref : (branch || DEFAULT_BRANCH);
-  const result = await commitEdits(repo, {
-    ref,
-    sha: current ? current.sha : null,
+  const clash = current ? await pathClash(repo, current.sha, target) : null;
+  if (clash) throw new ValidationError(clash);
+
+  const result = await writeFiles(repo, {
     edits: [{ path: target, content: buffer }],
     message,
+    branch,
     user,
   });
 
-  return {
-    ...result,
-    path: target,
-    created: !existed,
-    binary: looksBinary(buffer),
-  };
+  return { ...result, path: result.paths[0], created: !existed, binary: looksBinary(buffer) };
 }
 
 /** Remove a file. */
 export async function deleteFile(repo, { path: filePath, message, branch, user }) {
-  const target = safeRepoPath(filePath);
-  if (!target) throw new ValidationError('a file path is required');
+  const target = writablePath(filePath);
 
   const current = await targetRef(repo, branch);
   if (!current) throw new ValidationError('this repository has no commits yet');
@@ -222,12 +340,11 @@ async function fileExists(repo, sha, target) {
 
 /** Create a directory by committing a `.gitkeep` in it. */
 export async function createDirectory(repo, { path: dirPath, message, branch, user }) {
-  const dir = safeRepoPath(dirPath);
-  if (!dir) throw new ValidationError('a directory name is required');
+  const dir = writablePath(dirPath);
 
   const keep = `${dir}/.gitkeep`;
   const current = await targetRef(repo, branch);
-  const ref = current ? current.ref : (branch || DEFAULT_BRANCH);
+  const ref = current ? current.ref : newRefName(branch);
 
   const result = await commitEdits(repo, {
     ref,
@@ -252,8 +369,7 @@ export function editFromUpload(file) {
   }
   if (file.size > MAX_UPLOAD_BYTES) refuseTooLarge(file.size);
 
-  const target = safeRepoPath(decodeUploadName(file.originalname));
-  if (!target) throw new ValidationError('the uploaded file has no usable name');
+  const target = writablePath(decodeUploadName(file.originalname));
 
   return { path: target, content: file.buffer };
 }

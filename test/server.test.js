@@ -167,11 +167,10 @@ describe('repository pages', () => {
     assert.match(response.headers.get('location'), /\/blob\/main\/README\.md$/);
   });
 
-  test('the push command points at the directory on disk', async () => {
+  test('the git URL points at the working HTTP endpoint', async () => {
     const body = await text(REPO);
-    assert.match(body, /git push [^<]*acme[/\\]widget/);
-    // The site must not advertise an HTTP git endpoint it does not serve.
-    assert.equal(/acme\/widget\.git/.test(body), false);
+    // The clone field must be the http(s) endpoint git actually speaks to.
+    assert.match(body, /id="clone-url"[\s\S]{0,400}?http:\/\/127\.0\.0\.1:\d+\/acme\/widget\.git/);
   });
 });
 

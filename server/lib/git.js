@@ -7,23 +7,33 @@ import config from '../../config.js';
 const execFileAsync = promisify(execFile);
 
 /**
- * Await a spawned git process, resolving to its exit code instead of throwing.
- * Needed for the stdin-writing case, where the caller has already attached
- * handlers to the child and cannot use the promisified form.
+ * Await a spawned git process.
+ *
+ * Resolves with Buffers rather than strings: `cat-file blob` on a binary file
+ * must not pass through a UTF-8 decode, which would replace undecodable bytes
+ * and corrupt the content. Callers that want text use gitOut/gitLines.
  */
 function promiseChild(child) {
   return new Promise((resolve, reject) => {
     const out = [];
     const err = [];
-    child.stdout.on("data", (c) => out.push(c));
-    child.stderr.on("data", (c) => err.push(c));
-    child.on("error", reject);
-    child.on("close", (code) => {
+    // execFile may set an encoding on the streams, so a chunk can arrive as a
+    // string on one path and a Buffer on another. Normalise before collecting.
+    const collect = (target) => (chunk) => target.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, 'latin1'));
+
+    child.stdout.on('data', collect(out));
+    child.stderr.on('data', collect(err));
+    child.on('error', reject);
+    child.on('close', (code) => {
+      const stdout = Buffer.concat(out);
+      const stderr = Buffer.concat(err);
       if (code === 0) {
-        resolve({ stdout: Buffer.concat(out).toString("utf8"), stderr: Buffer.concat(err).toString("utf8") });
+        resolve({ stdout, stderr });
       } else {
-        const error = new Error(Buffer.concat(err).toString("utf8").trim() || `git exited with ${code}`);
+        const error = new Error(stderr.toString('utf8').trim() || `git exited with ${code}`);
         error.code = code;
+        error.stdout = stdout;
+        error.stderrText = stderr.toString('utf8');
         reject(error);
       }
     });
@@ -69,6 +79,9 @@ export async function git(cwd, args, {
       cwd,
       timeout,
       maxBuffer,
+      // Returning Buffers is the only way to keep `cat-file blob` honest for
+      // binary content.
+      encoding: 'buffer',
       env: {
         ...process.env,
         GIT_TERMINAL_PROMPT: '0',
@@ -80,10 +93,8 @@ export async function git(cwd, args, {
     });
 
     if (stdin !== undefined) {
-      // Content has to arrive on stdin: passing it as an argument would put it
-      // in the process list, and would break on anything large.
-      const chunks = [];
-      child.stdin.on('data', (chunk) => chunks.push(chunk));
+      // Content has to arrive on stdin: as an argument it would land in the
+      // process list, and it would break on anything large.
       child.stdin.end(stdin);
     }
 
@@ -97,23 +108,23 @@ export async function git(cwd, args, {
     if (error.killed) {
       throw new GitError(`git ${args[0]} timed out after ${timeout}ms`, { code: 'ETIMEDOUT' });
     }
-    const stderr = String(error.stderr || '').trim();
-    const stdout = String(error.stdout || '').trim();
+    const stderr = (error.stderrText || error.stderr || '').toString().trim();
+    const stdout = (error.stdout || '').toString().trim();
     const detail = stderr || stdout || error.message;
     throw new GitError(detail || 'git command failed', { code: error.code, stderr: detail });
   }
 }
 
-/** Run git and return trimmed stdout. */
+/** Run git and return trimmed stdout as text. */
 export async function gitOut(cwd, args, options) {
   const { stdout } = await git(cwd, args, options);
-  return stdout.trim();
+  return stdout.toString('utf8').trim();
 }
 
-/** Run git and return stdout as an array of lines (empty lines preserved). */
+/** Run git and return stdout as an array of lines (empty lines removed). */
 export async function gitLines(cwd, args, options) {
   const { stdout } = await git(cwd, args, options);
-  return stdout.split('\n').filter((line) => line.length > 0);
+  return stdout.toString('utf8').split('\n').filter((line) => line.length > 0);
 }
 
 /** Run git and return raw stdout bytes as a Buffer. */
@@ -185,9 +196,9 @@ const UNNAMED = /^(unnamed repository|edit this file 'description')/i;
  */
 export async function descriptionOf(dir) {
   try {
-    const { stdout: gitDirOut } = await git(dir, ['rev-parse', '--absolute-git-dir']);
-    const file = path.join(gitDirOut.trim(), 'description');
-    const text = await fs.readFile(file, 'utf8');
+    // gitOut decodes; git() hands back Buffers.
+    const gitDir = await gitOut(dir, ['rev-parse', '--absolute-git-dir']);
+    const text = await fs.readFile(path.join(gitDir, 'description'), 'utf8');
     const first = text.split('\n').map((line) => line.trim()).find(Boolean) || '';
     return UNNAMED.test(first) ? '' : first;
   } catch {

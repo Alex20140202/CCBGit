@@ -95,7 +95,9 @@ export function createApp() {
   // Then the management routes. These must precede pageRoutes, whose
   // "/:owner/:name" pattern would otherwise swallow "/new" and "/admin".
   app.use(manageRoutes);
-  app.use(uploadRoutes);
+  // Writing actions live under the repository they apply to. The mount only
+  // strips the prefix; unmatched paths fall through to the page router.
+  app.use('/:owner/:name', uploadRoutes);
   app.use(pageRoutes);
 
   // 404 handler

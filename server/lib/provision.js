@@ -68,6 +68,15 @@ export async function create({ name, description, template, author }) {
     await run(['init', '-q', '-b', 'main']);
     await fs.writeFile(path.join(dir, '.git', 'description'), `${description || name}\n`, 'utf8');
 
+    // A worktree repository refuses pushes to the branch it has checked out.
+    // `updateInstead` updates the working tree to match, which is exactly what
+    // we want: the site reads the repository, and a pushed change should become
+    // visible on disk rather than being refused.
+    await run([
+      '-c', 'receive.denyCurrentBranch=updateInstead',
+      'config', 'receive.denyCurrentBranch', 'updateInstead',
+    ]);
+
     const files = templateFiles(template, name);
     for (const [file, content] of files) {
       const target = path.join(dir, file);
@@ -80,10 +89,7 @@ export async function create({ name, description, template, author }) {
     }
 
     await run(['add', '-A']);
-    await run(['commit', '-q', '--allow-empty', '-m', `Initial commit from CCBGit`]);
-
-    // Default to not tracking anything unexpected if a template wrote a
-    // .gitignore; everything created above is already committed.
+    await run(['commit', '-q', '--allow-empty', '-m', 'Initial commit from CCBGit']);
   } catch (error) {
     // Do not leave a half-built directory behind for the next attempt to trip
     // over.

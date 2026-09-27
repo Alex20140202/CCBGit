@@ -10,9 +10,10 @@ const server = app.listen(config.port, config.host, () => {
   const url = `http://localhost:${config.port}`;
   console.log(`\n  ${config.site.title}  ·  ${config.site.tagline}`);
   console.log(`  ready on ${url}\n`);
-  console.log('  to add content, push into the repository directory:');
-  console.log(`    git push ${config.repoRoots[0]}/<name> <branch>`);
-  console.log('  (this site serves git\'s output, it is not a git remote)\n');
+  console.log('  to add content, either push over HTTP:');
+  console.log(`    git clone http://localhost:${config.port}/<owner>/<repo>.git`);
+  console.log('  or push straight into the repository directory:');
+  console.log(`    git push ${config.repoRoots[0]}/<name> <branch>\n`);
 });
 
 server.headersTimeout = 120000;

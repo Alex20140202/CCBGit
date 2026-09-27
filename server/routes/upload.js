@@ -47,18 +47,28 @@ async function currentFile(record, ref, filePath) {
 
 /* ------------------------------------------------------------- the editor */
 
-router.get('/edit/*', wrap(async (req, res) => {
+router.get('/edit/:ref/*', wrap(async (req, res) => {
   const record = registry.resolve(`${req.params.owner}/${req.params.name}`);
   const filePath = safeRepoPath(req.params[0]);
-  const ref = branchOf(req) || (await repoLib.repoMeta(record)).defaultBranch;
+  const meta = await repoLib.repoMeta(record);
+  const ref = req.params.ref || meta.defaultBranch;
   const permissions = await access.writeAccess(req.user, record);
 
   const file = await currentFile(record, ref, filePath);
   if (file && file.isDir) throw new ValidationError('that is a directory, not a file');
 
+  // The editor is its own page, so it needs the same locals the repository
+  // pages get, including the ones the breadcrumb and header partials expect.
+  res.locals.record = record;
+  res.locals.repo = { id: registry.identifierOf(record), name: record.name, owner: record.owner, path: record.path };
+  res.locals.meta = meta;
+  res.locals.ref = ref;
+  res.locals.refEncoded = encodeURIComponent(ref);
+  res.locals.writeAccess = permissions;
+
   res.render('edit', {
-    title: file ? `Editing ${file.name}` : `New file`,
-    file: file || { path: filePath, content: '', size: 0, language: 'plaintext' },
+    title: file ? `Editing ${file.name}` : 'New file',
+    file: file || { path: filePath, name: filePath.split('/').pop(), content: '', size: 0, language: 'plaintext' },
     filePath,
     ref,
     mode: file ? 'edit' : 'create',
@@ -71,7 +81,7 @@ router.get('/edit/*', wrap(async (req, res) => {
 
 /* --------------------------------------------------- create / edit / delete */
 
-router.post('/edit/*', wrap(async (req, res) => {
+router.post('/edit/:ref/*', wrap(async (req, res) => {
   const record = await writableRepo(req);
 
   const filePath = safeRepoPath(req.params[0]);
@@ -90,7 +100,7 @@ router.post('/edit/*', wrap(async (req, res) => {
   return res.redirect(302, `/${registry.identifierOf(record)}/commit/${result.commit}`);
 }));
 
-router.post('/delete/*', wrap(async (req, res) => {
+router.post('/delete/:ref/*', wrap(async (req, res) => {
   const record = await writableRepo(req);
 
   const filePath = safeRepoPath(req.params[0]);
@@ -203,24 +213,27 @@ router.post('/upload', wrap(async (req, res) => {
   const branch = fields.branch ? String(fields.branch) : branchOf(req);
 
   // One commit for the whole batch: someone dropping in five files expects one
-  // commit, not five.
-  const written = [];
-  for (const file of files) {
+  // commit in the history, not five.
+  const edits = files.map((file) => {
     const edit = upload.editFromUpload(file);
-    const target = targetDir ? `${targetDir}/${edit.path}` : edit.path;
-    written.push(edit.path);
-    await upload.writeFile(record, {
-      path: target,
+    return {
+      path: targetDir ? `${targetDir}/${edit.path}` : edit.path,
       content: edit.content,
-      message: files.length > 1 ? `${message}\n\nAdded: ${written.join(', ')}` : message,
-      branch,
-      user: req.user,
-    });
-  }
+    };
+  });
+
+  const result = await upload.writeFiles(record, {
+    edits,
+    message: files.length > 1
+      ? `${message}\n\nAdded: ${edits.map((edit) => edit.path).join(', ')}`
+      : message,
+    branch,
+    user: req.user,
+  });
 
   repoLib.invalidateAll();
 
-  if (fields.json === '1') return res.json({ ok: true, files: written });
+  if (fields.json === '1') return res.json({ ok: true, files: result.paths, commit: result.commit });
 
   return res.redirect(302, `/${registry.identifierOf(record)}/tree/${encodeURIComponent(branch || '')}`);
 }));

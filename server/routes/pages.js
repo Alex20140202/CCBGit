@@ -1,6 +1,8 @@
 import express from 'express';
+import config from '../../config.js';
 import * as registry from '../lib/repos.js';
 import * as repo from '../lib/repo.js';
+import * as access from '../lib/access.js';
 import { renderMarkdown, tableOfContents, highlight } from '../lib/render.js';
 import { ValidationError, assertSafeRef, safeRepoPath, parsePage } from '../lib/validate.js';
 
@@ -87,9 +89,25 @@ async function repoContext(req, res, next) {
   try {
     const record = registry.resolve(`${req.params.owner}/${req.params.name}`);
     const meta = await repo.repoMeta(record);
+    const id = registry.identifierOf(record);
+
     res.locals.record = record;
-    res.locals.repo = { id: registry.identifierOf(record), name: record.name, owner: record.owner, path: record.path };
+    res.locals.repo = { id, name: record.name, owner: record.owner, path: record.path };
     res.locals.meta = meta;
+
+    // Who may write here, and the URLs that actually work.
+    const writeAccess = await access.writeAccess(req.user, record);
+    res.locals.writeAccess = writeAccess;
+
+    const host = req.headers.host || `localhost:${config.port}`;
+    const http = `http://${host}/${id}.git`;
+    res.locals.git = {
+      http,
+      short: `${record.owner}/${record.name}`,
+      path: record.path,
+      urls: { http },
+    };
+
     next();
   } catch (error) {
     next(error);
@@ -187,11 +205,14 @@ repoRoutes.get('/blob/:ref/*', wrap(async (req, res) => {
   let toc = [];
   let highlighted = null;
   if (!file.binary && !file.tooLarge && !file.isSubmodule && file.content != null) {
+    // Render from a CRLF-normalised copy; `file.content` itself stays
+    // byte-faithful for the raw download and the editor.
+    const display = repo.forDisplay(file.content);
     if (file.isMarkdown) {
-      rendered = renderMarkdown(file.content);
-      toc = tableOfContents(file.content);
+      rendered = renderMarkdown(display);
+      toc = tableOfContents(display);
     } else {
-      highlighted = highlight(file.content, file.language);
+      highlighted = highlight(display, file.language);
     }
   }
 
@@ -356,15 +377,37 @@ router.get('/:owner/:name/archive/:format', wrap(async (req, res) => {
 }));
 
 // Raw file download.
+/**
+ * Raw download. Byte-faithful, binary included: this is the route a script or a
+ * browser "Save as" uses, so a UTF-8 round trip here would corrupt anything
+ * that is not text.
+ */
 router.get('/:owner/:name/raw/:ref/*', wrap(async (req, res) => {
   const record = res.locals.record;
   const ref = await repo.resolveRef(record, req.params.ref);
-  const filePath = safeRepoPath(req.params[0]);
-  const file = await repo.blob(record, ref, filePath);
-  if (file.binary) return res.status(415).send('binary file');
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.setHeader('Content-Disposition', `inline; filename="${file.name}"`);
-  res.send(file.content);
+  const file = await repo.blobBytes(record, ref, safeRepoPath(req.params[0]));
+
+  const guessed = mimeFor(file.name);
+  res.setHeader('Content-Type', guessed || 'application/octet-stream');
+  res.setHeader('Content-Length', String(file.size));
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Disposition', `attachment; filename="${file.name.replace(/["\\]/g, '_')}"`);
+  res.end(file.buffer);
 }));
+
+/** A small extension table, enough to make a download open sensibly. */
+const MIME_TYPES = {
+  '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8',
+  '.json': 'application/json', '.xml': 'application/xml', '.csv': 'text/csv; charset=utf-8',
+  '.pdf': 'application/pdf', '.zip': 'application/zip', '.gz': 'application/gzip',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.svg': 'image/svg+xml', '.webp': 'image/webp', '.ico': 'image/x-icon',
+  '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript',
+};
+
+function mimeFor(name) {
+  const dot = String(name).lastIndexOf('.');
+  return dot === -1 ? '' : (MIME_TYPES[String(name).slice(dot).toLowerCase()] || '');
+}
 
 export default router;

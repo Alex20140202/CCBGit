@@ -6,6 +6,14 @@
       <% if (!file.binary && !file.tooLarge && !file.isSubmodule) { %>
         <button class="ghost-button" type="button" data-copy-target="#blob-source">Copy</button>
       <% } %>
+      <% if (writeAccess.canWrite) { %>
+        <a class="ghost-button action-edit" href="/<%= repo.id %>/edit/<%= refEncoded %>/<%= h.escapeHtml(file.path) %>">Edit</a>
+        <form method="post" action="/<%= repo.id %>/delete/<%= refEncoded %>/<%= h.escapeHtml(file.path) %>" class="inline-form" data-confirm="Delete <%= h.escapeHtml(file.name) %>? This is recorded in the history.">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <input type="hidden" name="message" value="Delete <%= h.escapeHtml(file.name) %>">
+          <button class="ghost-button danger" type="submit">Delete</button>
+        </form>
+      <% } %>
       <a class="ghost-button" href="/<%= repo.id %>/commits?ref=<%= refEncoded %>&path=<%= encodeURIComponent(file.path) %>">History</a>
     </div>
   </div>

@@ -446,7 +446,11 @@ export async function blob(repo, ref, filePath) {
       text = text.slice(0, config.git.maxBlobSize);
       truncated = true;
     }
-    if (text.includes('\r')) text = text.replace(/\r\n/g, '\n');
+
+    // Line endings are left exactly as stored. The raw download has to be
+    // byte-faithful, and normalising here would quietly rewrite a file with
+    // CRLF endings on its way out. Anything that renders - the highlighter and
+    // the markdown renderer - normalises for itself.
 
     const lines = text.split('\n');
     return {
@@ -459,6 +463,48 @@ export async function blob(repo, ref, filePath) {
     };
   });
 }
+
+/**
+ * The raw bytes of a file at `ref`.
+ *
+ * Used by the download route, which has to be byte-faithful: decoding to a
+ * string would corrupt anything that is not valid UTF-8.
+ */
+export async function blobBytes(repo, ref, filePath) {
+  const clean = safeRepoPath(filePath);
+  if (!clean) throw new ValidationError('a file path is required');
+
+  let type;
+  try {
+    type = await gitOut(repo.path, ['cat-file', '-t', `${ref}:${clean}`]);
+  } catch {
+    throw new NotFoundError(`file not found: ${clean}`);
+  }
+  if (type === 'tree') throw new ValidationError(`${clean} is a directory`);
+  if (type !== 'blob') throw new NotFoundError(`file not found: ${clean}`);
+
+  const size = Number(await gitOut(repo.path, ['cat-file', '-s', `${ref}:${clean}`]).catch(() => 0)) || 0;
+  if (size > config.git.maxBlobSize) {
+    throw new ValidationError(
+      `${clean} is ${formatBytes(size)}, over the ${formatBytes(config.git.maxBlobSize)} download limit`,
+    );
+  }
+
+  return {
+    path: clean,
+    name: path.posix.basename(clean),
+    size,
+    sizeText: formatBytes(size),
+    buffer: await gitBuffer(repo.path, ['cat-file', 'blob', `${ref}:${clean}`]),
+  };
+}
+
+/** CRLF-normalised copy of a blob, for rendering only. */
+function forDisplay(text) {
+  return String(text).includes('\r') ? text.replace(/\r\n/g, '\n') : text;
+}
+
+export { forDisplay };
 
 
 /* --------------------------------------------------------------- commits */

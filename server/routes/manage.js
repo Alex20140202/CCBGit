@@ -2,6 +2,7 @@ import express from 'express';
 import * as auth from '../lib/auth.js';
 import * as requests from '../lib/requests.js';
 import * as provision from '../lib/provision.js';
+import * as access from '../lib/access.js';
 import { ValidationError, NotFoundError } from '../lib/validate.js';
 
 const router = express.Router({ mergeParams: true });

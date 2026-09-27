@@ -3,6 +3,50 @@
   const fileUrl = (rel) => `/${repo.id}/blob/${refEncoded}/${rel}`;
 %>
 <section class="panel file-tree">
+  <div class="tree-toolbar">
+    <% if (writeAccess.canWrite) { %>
+      <a class="ghost-button" href="/<%= repo.id %>/edit/<%= refEncoded %>/<%= h.escapeHtml(path ? path + '/newfile.txt' : 'newfile.txt') %>">
+        + New file
+      </a>
+      <button class="ghost-button" type="button" data-upload-toggle>Upload files</button>
+    <% } else { %>
+      <span class="tree-readonly">
+        <%= path ? h.escapeHtml(path) : 'repository root' %>
+      </span>
+    <% } %>
+  </div>
+
+  <% if (writeAccess.canWrite) { %>
+    <form class="upload-panel" data-upload-panel hidden
+          method="post" enctype="multipart/form-data"
+          action="/<%= repo.id %>/upload?_csrf=<%= encodeURIComponent(csrf) %>">
+      <%# The token also rides in the query string: urlencoded parsing does not
+          see a multipart body, so the hidden field below is ignored. %>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="branch" value="<%= h.escapeHtml(ref) %>">
+      <input type="hidden" name="path" value="<%= h.escapeHtml(path) %>">
+
+      <label class="upload-drop">
+        <input type="file" name="files" multiple required>
+        <span>Choose files, or drop them here</span>
+      </label>
+
+      <div class="upload-list" data-upload-list></div>
+
+      <label class="field">
+        <span>Commit message</span>
+        <input type="text" name="message" required maxlength="500"
+               value="Add files to <%= h.escapeHtml(path || '.') %>"
+               placeholder="Describe the change">
+      </label>
+
+      <div class="editor-actions">
+        <button class="primary-button" type="submit">Commit upload</button>
+        <button class="ghost-button" type="button" data-upload-toggle>Close</button>
+      </div>
+    </form>
+  <% } %>
+
   <% if (tree && tree.parent !== null && tree.parent !== undefined) { %>
     <a class="tree-up" href="<%= dirUrl(tree.parent) %>">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m0 0-6 6m6-6 6 6"></path></svg>

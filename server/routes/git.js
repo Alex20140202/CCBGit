@@ -10,7 +10,7 @@ import config from '../../config.js';
  * The git HTTP endpoints.
  *
  * Paths look like /<owner>/<name>.git/<service>, which is what `git clone` and
- * `git push` expect. They are mounted *before* the page routes, which would
+ * `git push` expect. They are mounted before the page routes, which would
  * otherwise treat `<name>.git` as a repository name.
  */
 const router = express.Router({ mergeParams: true });
@@ -18,7 +18,7 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 
 /**
  * git speaks Basic auth, so this authenticates by header as well as by session
- * cookie. No CSRF check applies: git cannot carry a token, and it presents its
+ * cookie. No CSRF check applies: git cannot carry a token, and it presents a
  * credential on every request.
  */
 router.use(auth.attachBasicAuth);
@@ -68,8 +68,8 @@ async function requireGitWrite(req, res, next) {
   return next();
 }
 
-/** Run one of the two services. */
-function service(handler) {
+/** Run the backend for one subpath and stream the exchange through. */
+function serve(subpath) {
   return wrap(async (req, res) => {
     const record = resolveRepo(req);
     res.setHeader('Cache-Control', 'no-cache, max-age=0, must-revalidate');
@@ -77,7 +77,7 @@ function service(handler) {
     try {
       await gitHttp.proxyGit(req, res, {
         repoPath: record.path,
-        service: handler.service,
+        subpath,
         remoteUser: req.user.username,
         protocolVersion: req.headers['git-protocol'],
       });
@@ -90,9 +90,6 @@ function service(handler) {
   });
 }
 
-const uploadPack = { service: 'git-upload-pack' };
-const receivePack = { service: 'git-receive-pack' };
-
 /**
  * The advertisement endpoint git calls first, for both clone and push.
  *
@@ -101,9 +98,9 @@ const receivePack = { service: 'git-receive-pack' };
  */
 router.get('/:owner/:name.git/info/refs', requireGitUser, wrap(async (req, res) => {
   const record = resolveRepo(req);
-  const name = gitHttp.assertService(String(req.query.service || 'git-upload-pack'));
+  const service = gitHttp.assertService(String(req.query.service || 'git-upload-pack'));
 
-  if (name === 'git-receive-pack') {
+  if (service === 'git-receive-pack') {
     const denial = await access.explainWriteDenial(req.user, record);
     if (denial) return res.status(403).type('text/plain').send(`${denial}\n`);
   }
@@ -112,7 +109,7 @@ router.get('/:owner/:name.git/info/refs', requireGitUser, wrap(async (req, res) 
   try {
     await gitHttp.proxyGit(req, res, {
       repoPath: record.path,
-      service: name,
+      subpath: '/info/refs',
       remoteUser: req.user.username,
       protocolVersion: req.headers['git-protocol'],
     });
@@ -123,10 +120,10 @@ router.get('/:owner/:name.git/info/refs', requireGitUser, wrap(async (req, res) 
 }));
 
 /** Fetch: clone and pull. */
-router.post('/:owner/:name.git/git-upload-pack', requireGitUser, service(uploadPack));
+router.post('/:owner/:name.git/git-upload-pack', requireGitUser, serve('/git-upload-pack'));
 
 /** Send: push. */
-router.post('/:owner/:name.git/git-receive-pack', requireGitWrite, service(receivePack));
+router.post('/:owner/:name.git/git-receive-pack', requireGitWrite, serve('/git-receive-pack'));
 
 /** A `.git` path that is not a repository. */
 router.use('/:owner/:name.git', (req, res) => {
