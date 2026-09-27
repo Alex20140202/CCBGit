@@ -1,0 +1,75 @@
+<%- include('partials/header') %>
+
+<div class="repo-layout">
+  <%- include('partials/sidebar', { repo, meta, ref, refEncoded, mode: 'commits', languages, commitTotal: total, path: scope }) %>
+
+  <div class="repo-main">
+    <%- include('partials/breadcrumbs', { repo, ref, refEncoded, path: '' }) %>
+
+    <div class="page-head compact">
+      <h1 class="page-title">
+        Commits
+        <% if (scope) { %><span class="scope-chip"><%= scope %></span><% } %>
+      </h1>
+      <p class="page-sub"><%= total %> commit<%= total === 1 ? '' : 's' %> on <strong><%= ref %></strong></p>
+    </div>
+
+    <section class="panel">
+      <ul class="commit-list roomy">
+        <% if (!commits.length) { %>
+          <li class="tree-empty">No commits found.</li>
+        <% } %>
+        <% commits.forEach((commit) => { %>
+          <li>
+            <span class="avatar small" style="background:<%= h.avatarColor(commit.author.email) %>"><%= h.initials(commit.author.name) %></span>
+            <div class="commit-body">
+              <a class="commit-subject" href="/<%= repo.id %>/commit/<%= commit.shortSha %>"><%- h.escapeHtml(commit.subject) %></a>
+              <span class="commit-meta">
+                <span class="commit-author"><%- h.escapeHtml(commit.author.name) %> committed</span>
+                <span class="commit-when" title="<%= commit.author.date %>"><%= h.relativeTime(commit.author.date) %></span>
+                <% if (commit.refs && commit.refs.length) { %>
+                  <span class="refs">
+                    <% commit.refs.slice(0, 4).forEach((r) => { %>
+                      <span class="ref-chip <%= r.kind %>"><%- h.escapeHtml(r.name) %></span>
+                    <% }) %>
+                  </span>
+                <% } %>
+              </span>
+              <% if (commit.body) { %>
+                <p class="commit-body-text"><%- h.escapeHtml(commit.body.split('\n')[0].slice(0, 200)) %></p>
+              <% } %>
+            </div>
+            <div class="commit-right">
+              <% if (commit.parents && commit.parents.length) { %>
+                <a class="parent-link" href="/<%= repo.id %>/commit/<%= commit.parents[0].slice(0, 7) %>" title="Parent commit">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M3 12h6m6 0h6"></path></svg>
+                </a>
+              <% } %>
+              <a class="sha" href="/<%= repo.id %>/commit/<%= commit.shortSha %>"><%= commit.shortSha %></a>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    </section>
+
+    <%
+      // Built by concatenation rather than an inner template literal: a nested
+      // output tag inside this block would close the outer tag early, because
+      // EJS scans for the first closing delimiter it finds.
+      const scopeParam = scope ? '&path=' + encodeURIComponent(scope) : '';
+      const commitPage = (n) => '/' + repo.id + '/commits?ref=' + refEncoded + scopeParam + '&page=' + n;
+    %>
+    <nav class="pagination" aria-label="Pagination">
+      <% if (page > 1) { %>
+        <a class="page-link" href="<%= commitPage(page - 1) %>">← Newer</a>
+      <% } %>
+      <span class="page-info">Page <%= page %></span>
+      <% if (hasMore) { %>
+        <a class="page-link" href="<%= commitPage(page + 1) %>">Older →</a>
+      <% } %>
+    </nav>
+  </div>
+</div>
+
+<% pageScript = '/js/repo.js' %>
+<%- include('partials/footer') %>

@@ -1,0 +1,51 @@
+<%- include('partials/header') %>
+
+<div class="repo-layout">
+  <%- include('partials/sidebar', { repo, meta, ref, refEncoded, mode, languages, commitTotal }) %>
+
+  <div class="repo-main">
+    <%- include('partials/breadcrumbs', { repo, ref, refEncoded, path }) %>
+    <%- include('partials/clone', { repo, ref, refEncoded, meta }) %>
+
+    <% if (meta.latestCommit) { %>
+      <div class="commit-strip">
+        <span class="avatar small" style="background:<%= h.avatarColor(meta.latestCommit.author.email) %>"><%= h.initials(meta.latestCommit.author.name) %></span>
+        <a class="commit-subject" href="/<%= repo.id %>/commit/<%= meta.latestCommit.shortSha %>">
+          <%- h.escapeHtml(meta.latestCommit.subject) %>
+        </a>
+        <a class="sha" href="/<%= repo.id %>/commit/<%= meta.latestCommit.shortSha %>"><%= meta.latestCommit.shortSha %></a>
+        <span class="commit-author"><%- h.escapeHtml(meta.latestCommit.author.name) %></span>
+        <span class="commit-when" title="<%= meta.latestCommit.author.date %>"><%= h.relativeTime(meta.latestCommit.author.date) %></span>
+        <span class="commit-count"><%= meta.commitCount %> commits</span>
+      </div>
+    <% } %>
+
+    <% if (mode === 'blob' && file) { %>
+      <%- include('partials/blob', { file, repo, ref, refEncoded }) %>
+    <% } else { %>
+      <%- include('partials/tree', { tree, path, readme, repo, ref, refEncoded }) %>
+    <% } %>
+
+    <% if (commits && commits.length && mode !== 'commits') { %>
+      <section class="panel recent-commits">
+        <h2 class="panel-title">
+          Recent commits
+          <a class="panel-more" href="/<%= repo.id %>/commits?ref=<%= refEncoded %><%= path ? `&path=${encodeURIComponent(path)}` : '' %>">View all →</a>
+        </h2>
+        <ul class="commit-list">
+          <% commits.forEach((commit) => { %>
+            <li>
+              <span class="avatar small" style="background:<%= h.avatarColor(commit.author.email) %>"><%= h.initials(commit.author.name) %></span>
+              <a class="commit-subject" href="/<%= repo.id %>/commit/<%= commit.shortSha %>"><%- h.escapeHtml(commit.subject) %></a>
+              <a class="sha" href="/<%= repo.id %>/commit/<%= commit.shortSha %>"><%= commit.shortSha %></a>
+              <span class="commit-when" title="<%= commit.author.date %>"><%= h.relativeTime(commit.author.date) %></span>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+  </div>
+</div>
+
+<% pageScript = '/js/repo.js' %>
+<%- include('partials/footer') %>

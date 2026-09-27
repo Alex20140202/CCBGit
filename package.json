@@ -1,25 +1,25 @@
 {
-  "name": "ccbgit",
+  "name": "ccb-git",
   "version": "1.0.0",
-  "description": "Super Git Repository Website",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
-  "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "npm run dev --workspace=packages/server",
-    "dev:client": "npm run dev --workspace=packages/client",
-    "build": "npm run build --workspaces",
-    "build:server": "npm run build --workspace=packages/server",
-    "build:client": "npm run build --workspace=packages/client",
-    "start": "npm run start --workspace=packages/server",
-    "install:all": "npm install && npm install --workspaces"
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
-  },
+  "description": "CCBGit - a self-hosted git repository website built with Node.js on both ends",
+  "type": "module",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20"
+  },
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "seed": "node bin/seed.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "compression": "^1.7.5",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "highlight.js": "^11.11.1",
+    "marked": "^15.0.6",
+    "morgan": "^1.10.0"
   }
 }

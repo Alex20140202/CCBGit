@@ -1,0 +1,48 @@
+<%- include('partials/header') %>
+
+<div class="repo-layout">
+  <div class="repo-main wide">
+    <div class="page-head compact">
+      <h1 class="page-title">Compare</h1>
+      <p class="page-sub">
+        <strong><%= base %></strong> … <strong><%= head %></strong>
+      </p>
+    </div>
+
+    <div class="compare-head">
+      <a class="sha big" href="/<%= repo.id %>/tree/<%= encodeURIComponent(base) %>"><%= base %></a>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m0 0-4-4m4 4-4 4"></path></svg>
+      <a class="sha big" href="/<%= repo.id %>/tree/<%= encodeURIComponent(head) %>"><%= head %></a>
+    </div>
+
+    <div class="compare-counts">
+      <span class="pill"><%= ahead %> commit<%= ahead === 1 ? '' : 's' %> ahead</span>
+      <span class="pill"><%= behind %> behind</span>
+    </div>
+
+    <% if (identical) { %>
+      <p class="blob-message">These refs point at the same commit — there is nothing to compare.</p>
+    <% } else { %>
+      <section class="panel">
+        <h2 class="panel-title">Commits</h2>
+        <ul class="commit-list roomy">
+          <% if (!commits.length) { %><li class="tree-empty">No commits between these refs.</li><% } %>
+          <% commits.forEach((commit) => { %>
+            <li>
+              <span class="avatar small" style="background:<%= h.avatarColor(commit.author.email) %>"><%= h.initials(commit.author.name) %></span>
+              <div class="commit-body">
+                <a class="commit-subject" href="/<%= repo.id %>/commit/<%= commit.shortSha %>"><%- h.escapeHtml(commit.subject) %></a>
+                <span class="commit-meta"><span class="commit-when" title="<%= commit.author.date %>"><%= h.relativeTime(commit.author.date) %></span></span>
+              </div>
+              <a class="sha" href="/<%= repo.id %>/commit/<%= commit.shortSha %>"><%= commit.shortSha %></a>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+
+    <%- include('partials/diff', { patch, repo, h, head }) %>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

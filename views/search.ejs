@@ -1,0 +1,57 @@
+<%- include('partials/header') %>
+
+<div class="repo-layout">
+  <div class="repo-main wide">
+    <div class="page-head compact">
+      <h1 class="page-title">Search</h1>
+      <p class="page-sub">Full-text search across <strong><%= ref %></strong> using <code>git grep</code>.</p>
+    </div>
+
+    <form class="filter-bar" method="get" action="/<%= repo.id %>/search">
+      <input type="hidden" name="ref" value="<%= ref %>">
+      <div class="filter-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M15.8 15.8 21 21"></path></svg>
+        <input type="search" name="q" value="<%- h.escapeHtml(term) %>" placeholder="Search code in this repository" autofocus>
+      </div>
+      <label class="checkbox">
+        <input type="checkbox" name="case" value="sensitive" <%= caseSensitive ? 'checked' : '' %>>
+        <span>Match case</span>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" name="regex" value="1" <%= useRegex ? 'checked' : '' %>>
+        <span>Regex</span>
+      </label>
+      <button class="primary-button" type="submit">Search</button>
+    </form>
+
+    <% if (!term) { %>
+      <div class="empty-state">
+        <h2>Search this repository</h2>
+        <p>Results are matched literally by default. Tick <strong>Regex</strong> for patterns.</p>
+      </div>
+    <% } else if (!result.results.length) { %>
+      <div class="empty-state">
+        <h2>No matches</h2>
+        <p>Nothing in <strong><%= ref %></strong> matches <code><%- h.escapeHtml(term) %></code>.</p>
+      </div>
+    <% } else { %>
+      <p class="page-sub">
+        <strong><%= result.total %></strong> match<%= result.total === 1 ? '' : 'es' %> for <code><%- h.escapeHtml(term) %></code>
+        <% if (result.truncated) { %><span class="warn">(showing the first <%= result.total %>)</span><% } %>
+      </p>
+
+      <ul class="search-results">
+        <% result.results.forEach((hit) => { %>
+          <li>
+            <a class="hit-path" href="/<%= repo.id %>/blob/<%= refEncoded %>/<%= hit.path %>#L<%= hit.line %>">
+              <%= hit.path %><span class="hit-line">:<%= hit.line %></span>
+            </a>
+            <pre class="hit-code"><%- h.highlightMatch(hit.text, hit.matchIndex, hit.matchLength) %></pre>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

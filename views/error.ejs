@@ -1,0 +1,23 @@
+<%- include('partials/header') %>
+
+<section class="error-page">
+  <p class="error-code"><%= status %></p>
+  <h1 class="page-title"><%= title %></h1>
+  <p class="page-sub"><%= message %></p>
+  <% if (detail) { %>
+    <pre class="error-detail"><%= detail %></pre>
+  <% } %>
+  <div class="error-actions">
+    <a class="primary-button" href="/">All repositories</a>
+    <button class="ghost-button" type="button" data-go-back>Go back</button>
+  </div>
+
+  <% if (typeof stack !== 'undefined' && stack) { %>
+    <details class="error-stack">
+      <summary>Stack trace</summary>
+      <pre><%= stack %></pre>
+    </details>
+  <% } %>
+</section>
+
+<%- include('partials/footer') %>

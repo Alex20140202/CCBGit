@@ -1,0 +1,52 @@
+<section class="panel blob-panel">
+  <div class="blob-head">
+    <span class="blob-name"><%= file.name %></span>
+    <div class="blob-actions">
+      <a class="ghost-button" href="/<%= repo.id %>/raw/<%= refEncoded %>/<%= file.path %>">Raw</a>
+      <% if (!file.binary && !file.tooLarge && !file.isSubmodule) { %>
+        <button class="ghost-button" type="button" data-copy-target="#blob-source">Copy</button>
+      <% } %>
+      <a class="ghost-button" href="/<%= repo.id %>/commits?ref=<%= refEncoded %>&path=<%= encodeURIComponent(file.path) %>">History</a>
+    </div>
+  </div>
+
+  <div class="blob-meta">
+    <span><%= h.formatBytes(file.size) %></span>
+    <% if (file.lineCount) { %><span class="dot">·</span><span><%= file.lineCount %> lines</span><% } %>
+    <% if (file.language) { %><span class="dot">·</span><span><%= file.language %></span><% } %>
+    <% if (file.truncated) { %><span class="dot">·</span><span class="warn">truncated</span><% } %>
+  </div>
+
+  <% if (file.tooLarge) { %>
+    <p class="blob-message">
+      This file is <strong><%= file.sizeText %></strong>, beyond the preview limit. Use <strong>Raw</strong> to download it.
+    </p>
+  <% } else if (file.isSubmodule) { %>
+    <p class="blob-message">This path is a submodule pointer. Clone recursively to fetch its contents.</p>
+  <% } else if (file.binary) { %>
+    <p class="blob-message">Binary file (<%= file.sizeText %>) — nothing to show.</p>
+  <% } else if (file.isMarkdown) { %>
+    <article class="markdown blob-markdown"><%- file.rendered %></article>
+    <% if (file.toc && file.toc.length > 2) { %>
+      <nav class="toc" aria-label="Table of contents">
+        <span class="toc-title">On this page</span>
+        <ul>
+          <% file.toc.forEach((heading) => { %>
+            <li class="toc-d<%= heading.depth %>"><a href="#<%= heading.id %>"><%- h.escapeHtml(heading.text) %></a></li>
+          <% }) %>
+        </ul>
+      </nav>
+    <% } %>
+  <% } else { %>
+    <div class="code-wrap" data-code data-language="<%= file.language %>">
+      <div class="code-gutter" aria-hidden="true">
+        <% for (let i = 1; i <= (file.lineCount || 1); i += 1) { %><span><%= i %></span><% } %>
+      </div>
+      <pre class="code-block"><code class="hljs language-<%= file.language %>"><%- file.highlighted %></code></pre>
+    </div>
+  <% } %>
+
+  <% if (!file.binary && !file.tooLarge && !file.isSubmodule) { %>
+    <textarea id="blob-source" class="visually-hidden" readonly aria-hidden="true" tabindex="-1"><%= file.content %></textarea>
+  <% } %>
+</section>

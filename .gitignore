@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# seeded sample repositories - recreate with `npm run seed`
+repos/
+
+# user accounts, repository requests, session key - never commit these
+data/
+
+# local environment
+.env
+.env.local
+
+# editor / OS noise
+.idea/
+.DS_Store
+*.swp
+*~
+
+# logs and coverage
+*.log
+npm-debug.log*
+coverage/
+.nyc_output/

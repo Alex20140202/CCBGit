@@ -1,0 +1,51 @@
+<%- include('partials/header') %>
+
+<div class="repo-layout">
+  <div class="repo-main wide">
+    <div class="page-head compact">
+      <h1 class="page-title">Commit</h1>
+      <p class="page-sub">
+        <a class="sha big" href="/<%= repo.id %>/tree/<%= commit.sha %>"><%= commit.shortSha %></a>
+        <span class="dot">·</span>
+        <%- h.escapeHtml(commit.subject) %>
+      </p>
+    </div>
+
+    <section class="panel commit-detail">
+      <div class="commit-detail-head">
+        <span class="avatar" style="background:<%= h.avatarColor(commit.author.email) %>"><%= h.initials(commit.author.name) %></span>
+        <div>
+          <p class="commit-author-name"><%- h.escapeHtml(commit.author.name) %></p>
+          <p class="commit-author-mail"><%- h.escapeHtml(commit.author.email) %></p>
+        </div>
+        <div class="commit-dates">
+          <p>authored <time title="<%= commit.author.date %>"><%= h.relativeTime(commit.author.date) %></time></p>
+          <% if (commit.committer.email !== commit.author.email) { %>
+            <p>committed by <%- h.escapeHtml(commit.committer.name) %> <time title="<%= commit.committer.date %>"><%= h.relativeTime(commit.committer.date) %></time></p>
+          <% } %>
+        </div>
+      </div>
+
+      <% if (commit.body) { %>
+        <pre class="commit-message"><%- h.escapeHtml(commit.body) %></pre>
+      <% } %>
+
+      <div class="commit-parents">
+        <span class="side-heading">Parents</span>
+        <% if (!commit.parents || !commit.parents.length) { %>
+          <span class="muted">none — this is a root commit</span>
+        <% } %>
+        <% (commit.parents || []).forEach((parent) => { %>
+          <a class="sha" href="/<%= repo.id %>/commit/<%= parent.slice(0, 7) %>"><%= parent.slice(0, 7) %></a>
+        <% }) %>
+        <% if (commit.parents && commit.parents.length > 1) { %>
+          <a class="ghost-button" href="/<%= repo.id %>/compare/<%= commit.parents[0] %>...<%= commit.sha %>">Compare with first parent</a>
+        <% } %>
+      </div>
+    </section>
+
+    <%- include('partials/diff', { patch: { files: commit.patch.files, truncated: commit.patch.truncated }, repo, h }) %>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,18 @@
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <span><%= site.title %></span>
+      <span class="dot">·</span>
+      <span>Node.js <%= process.versions.node %></span>
+      <span class="dot">·</span>
+      <a href="/api/status">API</a>
+    </div>
+  </footer>
+
+  <% if (typeof pageScript !== 'undefined' && pageScript) { %>
+    <script src="<%= pageScript %>" defer></script>
+  <% } %>
+  <script src="/js/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<%
+  const dirUrl = (rel) => `/${repo.id}/tree/${refEncoded}/${rel}`;
+  const fileUrl = (rel) => `/${repo.id}/blob/${refEncoded}/${rel}`;
+%>
+<section class="panel file-tree">
+  <% if (tree && tree.parent !== null && tree.parent !== undefined) { %>
+    <a class="tree-up" href="<%= dirUrl(tree.parent) %>">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m0 0-6 6m6-6 6 6"></path></svg>
+      <span>..</span>
+    </a>
+  <% } %>
+
+  <ul class="tree-list" data-tree-root="<%= path || '' %>">
+    <% if (!tree || !tree.entries || !tree.entries.length) { %>
+      <li class="tree-empty">This directory is empty.</li>
+    <% } %>
+    <% (tree ? tree.entries : []).forEach((entry) => { %>
+      <li class="tree-row">
+        <% if (entry.isSubmodule) { %>
+          <span class="tree-name submodule">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM8 10h8"></path></svg>
+            <%= entry.name %>
+            <span class="tree-hint">submodule</span>
+          </span>
+        <% } else if (entry.isDir) { %>
+          <a class="tree-name dir" href="<%= dirUrl(entry.path) %>">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="tree-icon"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"></path></svg>
+            <%= entry.name %>
+          </a>
+        <% } else { %>
+          <a class="tree-name file" href="<%= fileUrl(entry.path) %>">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="tree-icon"><path d="M6 3h8l4 4v14H6zM14 3v4h4"></path></svg>
+            <%= entry.name %>
+            <% if (entry.isSymlink) { %><span class="tree-hint">link</span><% } %>
+          </a>
+          <a class="tree-meta" href="/<%= repo.id %>/commits?ref=<%= refEncoded %>&path=<%= encodeURIComponent(entry.path) %>" title="History for <%= entry.name %>">history</a>
+        <% } %>
+        <span class="tree-commit" title="Last change">
+          <%= entry.isDir ? '' : '' %>
+        </span>
+      </li>
+    <% }) %>
+  </ul>
+</section>
+
+<% if (readme) { %>
+  <section class="panel readme">
+    <div class="readme-head">
+      <h2 class="panel-title"><%= readme.name %></h2>
+      <a class="panel-more" href="/<%= repo.id %>/blob/<%= refEncoded %>/<%= readme.name %>">View source</a>
+    </div>
+    <article class="markdown"><%- readme.html %></article>
+  </section>
+<% } %>

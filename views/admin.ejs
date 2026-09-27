@@ -1,0 +1,108 @@
+<%- include('partials/header', { title, site, filters: {} }) %>
+
+<div class="manage-wrap">
+  <div class="page-head">
+    <h1 class="page-title">Administration</h1>
+    <p class="page-sub">
+      Repository requests are created under <code><%- h.escapeHtml(targetRoot) %></code>.
+      <% if (user.isAdmin) { %> You are signed in as an administrator. <% } %>
+    </p>
+  </div>
+
+  <% if (welcome) { %>
+    <p class="notice success">
+      Welcome. This is the first account, so it has administrator rights — it is the
+      only one that can approve repository requests.
+    </p>
+  <% } %>
+
+  <section class="panel">
+    <h2 class="panel-title">
+      Awaiting review
+      <span class="count-chip"><%= pending.length %></span>
+    </h2>
+
+    <% if (!pending.length) { %>
+      <p class="panel-empty">Nothing waiting. The queue is empty.</p>
+    <% } else { %>
+      <ul class="request-list roomy">
+        <% pending.forEach(function (request) { %>
+          <li>
+            <div class="request-head">
+              <span class="request-name"><%- h.escapeHtml(request.name) %></span>
+              <span class="status-chip status-pending">pending</span>
+            </div>
+            <% if (request.description) { %>
+              <p class="request-desc"><%- h.escapeHtml(request.description) %></p>
+            <% } %>
+            <p class="request-meta">
+              asked by <strong><%- h.escapeHtml(request.requestedByName) %></strong>
+              (<%- h.escapeHtml(request.requestedBy) %>)
+              · <span title="<%= h.timestamp(request.createdAt) %>"><%= h.relativeTime(request.createdAt) %></span>
+              · template: <%- h.escapeHtml(request.template) %>
+            </p>
+
+            <form method="post" action="/admin/requests/<%- h.escapeHtml(request.id) %>/approve" class="decide-form">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <input type="text" name="note" maxlength="200" placeholder="Optional note to the requester">
+              <button class="primary-button" type="submit">Approve &amp; create</button>
+            </form>
+            <form method="post" action="/admin/requests/<%- h.escapeHtml(request.id) %>/reject" class="decide-form">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <input type="text" name="note" maxlength="200" placeholder="Reason (shown to the requester)">
+              <button class="danger-button" type="submit">Reject</button>
+            </form>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </section>
+
+  <div class="manage-grid">
+    <section class="panel">
+      <h2 class="panel-title">Decisions</h2>
+      <% if (!decided.length) { %>
+        <p class="panel-empty">No decisions yet.</p>
+      <% } else { %>
+        <ul class="request-list">
+          <% decided.slice(0, 20).forEach(function (request) { %>
+            <li>
+              <div class="request-head">
+                <span class="request-name">
+                  <% if (request.status === 'approved') { %>
+                    <a href="/<%- h.escapeHtml(request.name) %>"><%- h.escapeHtml(request.name) %></a>
+                  <% } else { %>
+                    <%- h.escapeHtml(request.name) %>
+                  <% } %>
+                </span>
+                <span class="status-chip status-<%= request.status %>"><%= request.status %></span>
+              </div>
+              <p class="request-meta">
+                <%- h.escapeHtml(request.requestedBy) %>
+                · by <%- h.escapeHtml(request.decidedBy) %>
+                · <span title="<%= h.timestamp(request.decidedAt) %>"><%= h.relativeTime(request.decidedAt) %></span>
+              </p>
+              <% if (request.note) { %><p class="request-note"><%- h.escapeHtml(request.note) %></p><% } %>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Accounts</h2>
+      <ul class="user-list">
+        <% users.forEach(function (account) { %>
+          <li>
+            <span class="avatar" style="background:<%= h.avatarColor(account.username) %>"><%= h.initials(account.displayName) %></span>
+            <span class="user-list-name"><%- h.escapeHtml(account.displayName) %></span>
+            <span class="user-list-handle"><%- h.escapeHtml(account.username) %></span>
+            <% if (account.isAdmin) { %><span class="status-chip status-approved">admin</span><% } %>
+          </li>
+        <% }) %>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

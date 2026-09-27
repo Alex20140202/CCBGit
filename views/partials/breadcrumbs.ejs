@@ -1,0 +1,27 @@
+<%
+  // Breadcrumb trail: /owner/repo/tree/<ref>/<path...>
+  const refEncoded = encodeURIComponent(ref);
+  const crumbs = [{ label: repo.name, href: `/${repo.id}/tree/${refEncoded}` }];
+  if (path) {
+    const parts = path.split('/');
+    parts.forEach((part, i) => {
+      crumbs.push({
+        label: part,
+        href: `/${repo.id}/tree/${refEncoded}/${parts.slice(0, i + 1).join('/')}`,
+      });
+    });
+  }
+%>
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <a href="/" class="crumb-home" title="All repositories">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1Z"></path></svg>
+  </a>
+  <% crumbs.forEach((crumb, i) => { %>
+    <span class="crumb-sep" aria-hidden="true">/</span>
+    <% if (i === crumbs.length - 1) { %>
+      <span class="crumb current"><%= crumb.label %></span>
+    <% } else { %>
+      <a class="crumb" href="<%= crumb.href %>"><%= crumb.label %></a>
+    <% } %>
+  <% }) %>
+</nav>

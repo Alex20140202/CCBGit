@@ -1,0 +1,36 @@
+<%- include('partials/header', { title, site, filters: {}, user: false }) %>
+
+<section class="auth-shell">
+  <div class="auth-card">
+    <h1 class="auth-title">Sign in</h1>
+    <p class="auth-sub"><%= site.title %> is private. Sign in to continue.</p>
+
+    <% if (error) { %>
+      <p class="form-error" role="alert"><%- h.escapeHtml(error) %></p>
+    <% } %>
+
+    <form method="post" action="/login" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="next" value="<%- h.escapeHtml(next || '/') %>">
+
+      <label class="field">
+        <span>Username</span>
+        <input type="text" name="username" value="<%- h.escapeHtml(values.username || '') %>"
+               autocomplete="username" required autofocus autocapitalize="none" spellcheck="false">
+      </label>
+
+      <label class="field">
+        <span>Password</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+
+      <button class="primary-button wide" type="submit">Sign in</button>
+    </form>
+
+    <p class="auth-alt">
+      No account yet? <a href="/register">Create one</a>.
+    </p>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

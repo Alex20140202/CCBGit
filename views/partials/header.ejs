@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title ? `${title} · ${site.title}` : site.title %></title>
+  <meta name="description" content="<%= (typeof meta !== 'undefined' && meta && meta.description) ? h.escapeHtml(meta.description) : site.tagline %>">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <% if (csrf) { %><meta name="csrf-token" content="<%= csrf %>"><% } %>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="/">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="6" cy="5" r="2.4"></circle>
+          <circle cx="6" cy="19" r="2.4"></circle>
+          <circle cx="18" cy="9" r="2.4"></circle>
+          <path d="M6 7.4v9.2M8.4 19c4 0 5.6-3 6.6-7.4"></path>
+        </svg>
+        <span class="brand-text"><%= site.title %></span>
+      </a>
+
+      <% const signedIn = typeof user !== 'undefined' && !!user; %>
+      <% if (signedIn) { %>
+        <form class="global-search" action="/" method="get" role="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="search-icon">
+            <circle cx="11" cy="11" r="6.5"></circle>
+            <path d="M15.8 15.8 21 21"></path>
+          </svg>
+          <input type="search" name="q" placeholder="Search repositories"
+                 value="<%= (typeof filters !== 'undefined' && filters.q) ? h.escapeHtml(filters.q) : '' %>"
+                 autocomplete="off" aria-label="Search repositories">
+          <kbd>/</kbd>
+        </form>
+      <% } else { %>
+        <span class="header-spacer"></span>
+      <% } %>
+
+      <div class="header-actions">
+        <% if (signedIn) { %>
+          <a class="primary-button" href="/new" title="Request a new repository">+ New repository</a>
+          <% if (user.isAdmin) { %>
+            <a class="ghost-button" href="/admin" title="Review requests">admin</a>
+          <% } %>
+          <details class="user-menu">
+            <summary title="<%= user.displayName %>">
+              <span class="avatar" style="background:<%= h.avatarColor(user.username) %>"><%= h.initials(user.displayName) %></span>
+            </summary>
+            <div class="user-popover">
+              <p class="user-name"><%- h.escapeHtml(user.displayName) %></p>
+              <p class="user-role"><%= user.isAdmin ? 'Administrator' : 'Member' %></p>
+              <form method="post" action="/logout">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <button class="ghost-button" type="submit">Sign out</button>
+              </form>
+            </div>
+          </details>
+        <% } %>
+        <a class="ghost-button" href="/api/status" title="Service status">status</a>
+        <button class="icon-button" id="theme-toggle" type="button" title="Toggle theme" aria-label="Toggle colour theme">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"></path></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="wrap">

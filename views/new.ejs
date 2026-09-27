@@ -1,0 +1,96 @@
+<%- include('partials/header', { title, site, filters: {} }) %>
+
+<div class="manage-wrap">
+  <div class="page-head">
+    <h1 class="page-title">Request a new repository</h1>
+    <p class="page-sub">
+      Repositories are created under <code><%- h.escapeHtml(targetRoot) %></code>
+      once an administrator approves the request.
+    </p>
+  </div>
+
+  <% if (submitted) { %>
+    <p class="notice success">Request submitted. An administrator will review it shortly.</p>
+  <% } %>
+
+  <% if (error) { %>
+    <p class="form-error" role="alert"><%- h.escapeHtml(error) %></p>
+  <% } %>
+
+  <div class="manage-grid">
+    <section class="panel">
+      <h2 class="panel-title">Details</h2>
+      <form method="post" action="/new" class="form padded">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+        <label class="field">
+          <span>Repository name</span>
+          <input type="text" name="name" value="<%- h.escapeHtml(values.name || '') %>"
+                 required autofocus autocapitalize="none" spellcheck="false"
+                 pattern="[A-Za-z0-9][A-Za-z0-9._\-]{1,48}"
+                 title="2-49 characters: letters, digits, dot, dash, underscore"
+                 placeholder="my-project">
+          <small>Must be a single name — no slashes, no spaces.</small>
+        </label>
+
+        <label class="field">
+          <span>Description <em>optional</em></span>
+          <input type="text" name="description" maxlength="200"
+                 value="<%- h.escapeHtml(values.description || '') %>"
+                 placeholder="What lives in here?">
+        </label>
+
+        <fieldset class="field">
+          <span>Start from</span>
+          <% templates.forEach(function (template, i) { %>
+            <label class="radio">
+              <input type="radio" name="template" value="<%= template.id %>"
+                     <%= (values.template ? values.template === template.id : template.id === 'empty') ? 'checked' : '' %>>
+              <span><%- h.escapeHtml(template.label) %></span>
+            </label>
+          <% }) %>
+        </fieldset>
+
+        <button class="primary-button" type="submit">Submit request</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">My requests</h2>
+      <% if (!requests.length) { %>
+        <p class="panel-empty">You have not requested any repositories yet.</p>
+      <% } else { %>
+        <ul class="request-list">
+          <% requests.forEach(function (request) { %>
+            <li>
+              <div class="request-head">
+                <span class="request-name">
+                  <% if (request.status === 'approved') { %>
+                    <a href="/<%- h.escapeHtml(request.name) %>"><%- h.escapeHtml(request.name) %></a>
+                  <% } else { %>
+                    <%- h.escapeHtml(request.name) %>
+                  <% } %>
+                </span>
+                <span class="status-chip status-<%= request.status %>"><%= request.status %></span>
+              </div>
+              <% if (request.description) { %>
+                <p class="request-desc"><%- h.escapeHtml(request.description) %></p>
+              <% } %>
+              <p class="request-meta">
+                requested <span title="<%= h.timestamp(request.createdAt) %>"><%= h.relativeTime(request.createdAt) %></span>
+                <% if (request.decidedAt) { %>
+                  · <%= request.status %> <span title="<%= h.timestamp(request.decidedAt) %>"><%= h.relativeTime(request.decidedAt) %></span>
+                <% } %>
+              </p>
+              <% if (request.note) { %>
+                <p class="request-note"><%- h.escapeHtml(request.note) %></p>
+              <% } %>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

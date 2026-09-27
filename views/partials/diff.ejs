@@ -1,0 +1,68 @@
+<%
+  // The commit view passes `commit`; the compare view has no single commit and
+  // links blobs to its head ref instead.
+  const hasCommit = typeof commit !== 'undefined' && commit;
+  const hasRef = typeof ref !== 'undefined' && ref;
+  const diffRef = hasCommit ? commit.sha : encodeURIComponent(hasRef ? ref : head);
+%>
+<% if (patch && patch.files.length) { %>
+  <section class="panel">
+    <div class="diff-summary">
+      <span class="diff-stat"><b class="add">+<%= patch.files.reduce((n, f) => n + f.additions, 0) %></b></span>
+      <span class="diff-stat"><b class="del">−<%= patch.files.reduce((n, f) => n + f.deletions, 0) %></b></span>
+      <span class="dot">·</span>
+      <span><%= patch.files.length %> file<%= patch.files.length === 1 ? '' : 's' %> changed</span>
+    </div>
+
+    <% patch.files.forEach((file) => { %>
+      <details class="diff-file" open>
+        <summary>
+          <span class="diff-status status-<%= file.status %>"><%= h.statusLabel(file.status) %></span>
+          <a class="diff-path" href="/<%= repo.id %>/blob/<%= diffRef %>/<%= file.newPath %>">
+            <%= file.isNew ? file.newPath : file.isDeleted ? file.oldPath : file.newPath %>
+          </a>
+          <span class="diff-counts">
+            <b class="add">+<%= file.additions %></b>
+            <b class="del">−<%= file.deletions %></b>
+          </span>
+        </summary>
+
+        <% if (file.binary) { %>
+          <p class="blob-message">Binary file not shown.</p>
+        <% } else { %>
+          <div class="diff-body">
+            <% file.hunks.forEach((hunk) => { %>
+              <div class="diff-hunk">
+                <div class="hunk-header"><%= hunk.header %></div>
+                <table class="diff-table">
+                  <tbody>
+                    <% let oldLine = hunk.oldStart; let newLine = hunk.newStart; %>
+                    <% hunk.lines.forEach((line) => { %>
+                      <tr class="line-<%= line.type %>">
+                        <% if (line.type === 'add') { %>
+                          <td class="line-no"></td><td class="line-no"><%= newLine++ %></td>
+                          <td class="line-code"><span class="marker">+</span><%= h.highlightDiffLine(line.text, file.newPath) %></td>
+                        <% } else if (line.type === 'del') { %>
+                          <td class="line-no"><%= oldLine++ %></td><td class="line-no"></td>
+                          <td class="line-code"><span class="marker">−</span><%= h.highlightDiffLine(line.text, file.oldPath) %></td>
+                        <% } else if (line.type === 'ctx') { %>
+                          <td class="line-no"><%= oldLine++ %></td><td class="line-no"><%= newLine++ %></td>
+                          <td class="line-code"><%= h.highlightDiffLine(line.text, file.newPath) %></td>
+                        <% } else { %>
+                          <td class="line-no" colspan="2"><span class="marker">\</span></td>
+                          <td class="line-code"><%- h.escapeHtml(line.text) %></td>
+                        <% } %>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      </details>
+    <% }) %>
+  </section>
+<% } else { %>
+  <p class="blob-message">This commit contains no file changes.</p>
+<% } %>
