@@ -94,6 +94,9 @@ router.post('/admin/requests/:id/:decision', auth.requireAdmin, wrap(async (req,
       template: record.template,
       author: requester,
     });
+
+    // The requester owns it, which is what grants them push access later.
+    await access.setOwner(record.name, requester.username);
   }
 
   const updated = await requests.decide(id, status, auth.publicUser(req.user), req.body.note);

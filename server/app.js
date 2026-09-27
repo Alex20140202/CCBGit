@@ -77,16 +77,25 @@ export function createApp() {
 
   app.use(authRoutes);
 
+  app.use(authRoutes);
+
+  // The git endpoints sit before the CSRF gate and authenticate themselves with
+  // HTTP Basic: git cannot carry a token, and it presents a credential on every
+  // request. Their paths (`/<owner>/<name>.git/...`) would also be swallowed by
+  // the page router's `/:owner/:name` pattern if they came later.
+  app.use(gitRoutes);
+
   app.use(auth.requireAuth);
   // Every route past this point that accepts a POST is a form handler, so the
   // CSRF token is enforced globally rather than per route.
   app.use(auth.requireCsrf);
 
-  // /api first: it has its own catch-all for unknown endpoints.
+  // /api next: it has its own catch-all for unknown endpoints.
   app.use('/api', apiRoutes);
   // Then the management routes. These must precede pageRoutes, whose
   // "/:owner/:name" pattern would otherwise swallow "/new" and "/admin".
   app.use(manageRoutes);
+  app.use(uploadRoutes);
   app.use(pageRoutes);
 
   // 404 handler
