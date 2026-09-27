@@ -7,6 +7,8 @@ import apiRoutes from './routes/api.js';
 import pageRoutes from './routes/pages.js';
 import authRoutes from './routes/auth.js';
 import manageRoutes from './routes/manage.js';
+import gitRoutes from './routes/git.js';
+import uploadRoutes from './routes/upload.js';
 import * as auth from './lib/auth.js';
 import * as registry from './lib/repos.js';
 import { viewHelpers } from './lib/view-helpers.js';

@@ -1,8 +1,6 @@
 import path from 'node:path';
 import os from 'node:os';
 import fsp from 'node:fs/promises';
-import crypto from 'node:crypto';
-import config from '../../config.js';
 import { git, gitOut } from './git.js';
 import { looksBinary } from './binary.js';
 import { safeRepoPath, ValidationError, NotFoundError } from './validate.js';
@@ -78,11 +76,11 @@ async function targetRef(repo, requested) {
  * works the same way.
  */
 async function commitEdits(repo, { ref, sha, edits, message, user, allowEmpty = false }) {
-  const env = { ...authorEnv(user) };
-  const run = (args, extra = {}) => git(repo.path, args, { env: { ...env, ...extra } });
+  const env = authorEnv(user);
+  const run = (args, extra = {}, stdin) => git(repo.path, args, { env: { ...env, ...extra }, stdin });
 
   const indexFile = path.join(
-    await fsp.mkdtemp(path.join(config.auth.dataDir, 'upload-')),
+    await fsp.mkdtemp(path.join(os.tmpdir(), 'ccbgit-index-')),
     'index',
   );
 
@@ -92,15 +90,15 @@ async function commitEdits(repo, { ref, sha, edits, message, user, allowEmpty = 
     const withIndex = { GIT_INDEX_FILE: indexFile };
 
     if (sha) {
-      // Start from the current tip so the new commit has the same tree plus
-      // whatever is being added or removed.
-      const read = await run(['read-tree', sha], withIndex);
-      void read;
+      // Start from the current tip so the new commit is that tree plus the
+      // edits, without ever touching a working tree.
+      await run(['read-tree', sha], withIndex);
     }
 
     for (const edit of edits) {
       const target = safeRepoPath(edit.path);
       if (!target) throw new ValidationError('a file path is required');
+
       if (edit.delete) {
         await run(['update-index', '--force-remove', '--', target], withIndex);
         continue;
@@ -109,25 +107,31 @@ async function commitEdits(repo, { ref, sha, edits, message, user, allowEmpty = 
       const content = Buffer.isBuffer(edit.content) ? edit.content : Buffer.from(String(edit.content), 'utf8');
       if (content.length > MAX_UPLOAD_BYTES) refuseTooLarge(content.length);
 
-      // hash-object writes the blob into the object database and prints its
-      // sha; --stdin keeps the content out of the process arguments.
+      // `hash-object` writes the blob and prints its sha. The content goes in
+      // on stdin: as an argument it would land in the process list.
       const { stdout } = await run(
         ['hash-object', '-w', '--stdin', '--path', target],
-        { ...withIndex, GIT_ASKPASS: 'echo' },
+        withIndex,
+        content,
       );
       const blob = stdout.trim();
+      if (!/^[0-9a-f]{40,64}$/.test(blob)) {
+        throw new Error(`could not store ${target} in the object database`);
+      }
 
-      // `--add` is required for a path that is not in the tree yet.
+      // --add is needed for a path that is not in the tree yet.
       await run(['update-index', '--add', '--cacheinfo', `100644,${blob},${target}`], withIndex);
     }
 
     const { stdout: treeOut } = await run(['write-tree'], withIndex);
     const tree = treeOut.trim();
 
-    if (sha && tree === sha) {
-      const { stdout: parentTree } = await run(['rev-parse', `${sha}^{tree}`]);
-      if (parentTree.trim() === tree) {
-        if (!allowEmpty) throw new ValidationError('nothing to commit: the file is unchanged');
+    if (sha && !allowEmpty) {
+      // Catching a no-op here gives a better message than a confusing
+      // "nothing to commit" from git after the fact.
+      const { stdout: parentTreeOut } = await run(['rev-parse', `${sha}^{tree}`]);
+      if (parentTreeOut.trim() === tree) {
+        throw new ValidationError('nothing to commit: that change would not alter the tree');
       }
     }
 
@@ -137,14 +141,14 @@ async function commitEdits(repo, { ref, sha, edits, message, user, allowEmpty = 
     ]);
     const commit = commitOut.trim();
 
-    // Point the branch at the new commit. `compare-and-swap` on the old value
-    // makes two concurrent edits fail loudly instead of silently losing one.
+    // Move the branch. Passing the old value makes this a compare-and-swap, so
+    // two people editing at once produces a clear failure rather than one
+    // silently overwriting the other.
     const updateArgs = sha
       ? ['update-ref', '-m', `browser: ${firstLine(message)}`, ref, commit, sha]
       : ['update-ref', '-m', `browser: ${firstLine(message)}`, ref, commit];
 
-    const { stderr } = await run(updateArgs);
-    void stderr;
+    await run(updateArgs);
 
     return { commit, tree, ref };
   } finally {
@@ -269,9 +273,3 @@ export function decodeUploadName(name) {
   return decoded.replace(/[\u0000-\u001f\u007f]/g, '').trim();
 }
 
-/** A short, filesystem-safe scratch name for the temporary index. */
-export function scratchName() {
-  return crypto.randomBytes(8).toString('hex');
-}
-
-export { MAX_UPLOAD_BYTES as MAX_FILE_BYTES, languageFor, isProbablyText, gitLines, gitBuffer };
