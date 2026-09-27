@@ -81,7 +81,8 @@ administrator can then create further accounts.
 - File tree, with directory history and file sizes
 - Blob view with server-side syntax highlighting, a line-number gutter and
   `#L42` line anchors
-- Markdown files rendered to HTML, with a table of contents for long documents
+- Markdown files rendered to HTML, with hover permalinks on headings and a
+  table of contents for long documents
 - Raw file download and `tar.gz` / `zip` archive of any ref
 
 **History**
@@ -99,7 +100,7 @@ administrator can then create further accounts.
 **Everywhere**
 
 - Light / dark / follow-system themes, remembered in `localStorage`
-- Responsive layout, keyboard accessible, `prefers-reduced-motion` respected
+- Responsive down to a phone, and a print stylesheet that drops the chrome
 - Language statistics per repository
 - Contributor list with per-person commit counts
 
@@ -220,6 +221,46 @@ Stack traces are hidden from error pages unless `SHOW_STACKS=true`.
 
 Behind a TLS proxy, set `COOKIE_SECURE=true` and `TRUST_PROXY=true`.
 
+## Language support
+
+Detection is a three-step cascade, cheapest first:
+
+1. **Filename** — 94 exact matches (`Dockerfile`, `go.mod`, `CMakeLists.txt`,
+   `.bashrc`, `build.gradle`) plus a stem rule for suffixed variants
+   (`dockerfile.prod`, `makefile.am`).
+2. **Extension** — 155 mappings covering the languages highlight.js ships a
+   grammar for, resolved through the suffix chain so compound names work:
+   `types.d.ts` → `.d.ts` → `.ts`, `view.blade.php` → `.blade.php` → `.php`.
+3. **Content** — only when the first two come up empty, the file is sampled and
+   a grammar is guessed.
+
+That last step is deliberately conservative, because a wrong label is worse
+than an honest one:
+
+- The candidate set excludes obscure grammars (ABNF, lasso, DOS batch) that
+  outscore real languages on short samples.
+- A guess must clear a relevance threshold of 15. Measured on real files, a
+  genuine match scores ~22 while the mis-detections score 5–11, so the
+  threshold separates them cleanly.
+- The same threshold applies to rendering, so a file that cannot be identified
+  is shown as plain text rather than highlighted as something it is not.
+
+Where highlight.js has no grammar at all (Zig, Terraform/HCL, fish, sed), the
+file reports plain text instead of borrowing a misleading grammar. Where a
+close proxy exists it is used and it is a defensible one: CUDA → C++, GDScript
+and `.p` → Python, OpenCL → C, EJS → JavaScript, darcs patches → diff.
+
+The language statistics use the same detector on a bounded sample (the 25
+largest unrecognised files), so an unlisted language does not silently merge
+into "plain text" — but a file that cannot be identified confidently stays
+plain text rather than being miscounted.
+
+Two size guards keep this from becoming a denial of service against yourself:
+highlighting a known grammar is skipped above 512 KB, and content sniffing
+above 24 KB (64 KB for the statistics), because `highlightAuto` runs every
+candidate grammar over its input. Diff lines are never sniffed — that would
+run the detector once per line.
+
 ## Performance
 
 Git output is cached per repository with a short TTL (`CACHE_TTL`, 15s by
@@ -237,16 +278,18 @@ archive` straight to the socket instead of being held in memory.
 npm test
 ```
 
-103 cases across four files, using only `node:test`:
+126 cases across five files, using only `node:test`:
 
 - `test/validate.test.js` — ref, path, and repository-name validation
 - `test/render.test.js` — markdown rendering, XSS, diff parsing
+- `test/languages.test.js` — the detection cascade, the confidence threshold,
+  the size guards, and the claim that every mapped id is a grammar that exists
 - `test/auth.test.js` — accounts, sessions, CSRF, role boundaries, and the
   whole request → approve → repository-on-disk flow
 - `test/server.test.js` — the real app against a throwaway repository built in
   a temp directory: every page, the whole API, archives, and hostile input
 
-The two server suites each build their own repositories and data directory in a
+The server suites each build their own repositories and data directory in a
 temp folder, so a test run never touches your real `repos/` or `data/`.
 
 ## Layout
@@ -263,11 +306,11 @@ server/
     git.js             git process wrapper, typed errors
     repo.js            everything you can do to one repository
     repos.js           discovery, indexing, search over the registry
-    render.js          markdown, syntax highlighting, escaping
+    render.js          markdown, syntax highlighting, escaping, sniffing
     view-helpers.js    the `h` object every template uses
     validate.js        input validation and HTTP status mapping
     cache.js           TTL + LRU cache
-    languages.js       language detection and formatting
+    languages.js       the detection cascade
   routes/
     auth.js            sign in, register, sign out
     manage.js          request a repository, review requests
