@@ -1,7 +1,9 @@
 <%- include('partials/header') %>
 
 <div class="repo-layout">
-  <div class="repo-main wide">
+  <%- include('partials/sidebar', { repo, ref, refEncoded, mode }) %>
+
+  <div class="repo-main">
     <div class="page-head compact">
       <h1 class="page-title">Commit</h1>
       <p class="page-sub">
@@ -48,4 +50,4 @@
   </div>
 </div>
 
-<%- include('partials/footer') %>
+<%- include('partials/footer', { pageScript: '/js/repo.js' }) %>

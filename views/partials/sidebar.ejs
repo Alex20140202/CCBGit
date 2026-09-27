@@ -2,27 +2,36 @@
   // `path` is optional: the commit-history view scopes by `scope` instead.
   const scopePath = (typeof path !== 'undefined' && path) ? path : '';
   const scopeParam = scopePath ? '&path=' + encodeURIComponent(scopePath) : '';
+
+  // A blob belongs under Code, and a single commit under Commits, so neither
+  // view may leave the navigation with nothing highlighted.
+  const onCode = mode === 'tree' || mode === 'blob';
+  const onCommits = mode === 'commits' || mode === 'commit';
+  const onSearch = mode === 'search';
 %>
 <aside class="repo-sidebar">
   <nav class="side-nav" aria-label="Repository">
-    <a class="side-link <%= mode === 'tree' ? 'is-active' : '' %>" href="/<%= repo.id %>/tree/<%= refEncoded %>">
+    <a class="side-link <%= onCode ? 'is-active' : '' %>" href="/<%= repo.id %>/tree/<%= refEncoded %>"
+       <%= onCode ? 'aria-current="page"' : '' %>>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>
       <span>Code</span>
     </a>
-    <a class="side-link <%= mode === 'commits' ? 'is-active' : '' %>"
-       href="/<%= repo.id %>/commits?ref=<%= refEncoded %><%= scopeParam %>">
+    <a class="side-link <%= onCommits ? 'is-active' : '' %>"
+       href="/<%= repo.id %>/commits?ref=<%= refEncoded %><%= scopeParam %>"
+       <%= onCommits ? 'aria-current="page"' : '' %>>
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"></circle><path d="M3 12h6m6 0h6M12 3v6m0 6v6"></path></svg>
       <span>Commits</span>
       <% if (typeof commitTotal !== 'undefined' && commitTotal) { %><em class="side-count"><%= commitTotal %></em><% } %>
     </a>
-    <a class="side-link" href="/<%= repo.id %>/search?ref=<%= refEncoded %>">
+    <a class="side-link <%= onSearch ? 'is-active' : '' %>" href="/<%= repo.id %>/search?ref=<%= refEncoded %>"
+       <%= onSearch ? 'aria-current="page"' : '' %>>
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M15.8 15.8 21 21"></path></svg>
       <span>Search</span>
     </a>
     <div class="side-sep"></div>
     <span class="side-heading">Branches</span>
     <ul class="side-list" id="branch-list">
-      <li><a class="side-ref is-current" href="/<%= repo.id %>/tree/<%= refEncoded %>">
+      <li><a class="side-ref is-current" aria-current="true" href="/<%= repo.id %>/tree/<%= refEncoded %>">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v12a3 3 0 0 0 3 3h7m0 0-3-3m3 3-3 3"></path></svg>
         <span class="ref-name"><%= ref %></span>
       </a></li>

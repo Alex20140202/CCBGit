@@ -256,8 +256,11 @@ repoRoutes.get('/commits', wrap(async (req, res) => {
 // A single commit with its diff.
 repoRoutes.get('/commit/:sha', wrap(async (req, res) => {
   const record = registry.resolve(`${req.params.owner}/${req.params.name}`);
+  // The sidebar needs a ref to render its branch list, same as every other
+  // repository page.
+  await withRef(req, res);
   const details = await repo.commit(record, req.params.sha);
-  res.render('commit', { title: details.subject, commit: details });
+  res.render('commit', { title: details.subject, commit: details, mode: 'commit' });
 }));
 
 // Compare two refs. The spec is parsed by hand because Express's pattern
@@ -272,6 +275,9 @@ repoRoutes.get('/compare/*', wrap(async (req, res) => {
   const [baseRaw, headRaw] = parts;
   const base = assertSafeRef(baseRaw, { allowEmpty: false });
   const head = assertSafeRef(headRaw, { allowEmpty: false });
+
+  // For the sidebar's branch list only; the comparison itself uses base/head.
+  await withRef(req, res);
 
   const [ahead, behind, log, patch] = await Promise.all([
     gitCount(record, `${base}..${head}`),
@@ -291,6 +297,7 @@ repoRoutes.get('/compare/*', wrap(async (req, res) => {
     ahead,
     behind,
     identical,
+    mode: 'compare',
     commits: identical ? [] : log.items,
     patch,
   });

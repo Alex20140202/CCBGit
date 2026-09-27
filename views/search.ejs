@@ -1,7 +1,9 @@
 <%- include('partials/header') %>
 
 <div class="repo-layout">
-  <div class="repo-main wide">
+  <%- include('partials/sidebar', { repo, ref, refEncoded, mode: 'search' }) %>
+
+  <div class="repo-main">
     <div class="page-head compact">
       <h1 class="page-title">Search</h1>
       <p class="page-sub">Full-text search across <strong><%= ref %></strong> using <code>git grep</code>.</p>
@@ -37,7 +39,7 @@
     <% } else { %>
       <p class="page-sub">
         <strong><%= result.total %></strong> match<%= result.total === 1 ? '' : 'es' %> for <code><%- h.escapeHtml(term) %></code>
-        <% if (result.truncated) { %><span class="warn">(showing the first <%= result.total %>)</span><% } %>
+        <% if (result.truncated) { %><span class="warn">— refine the search to see the rest</span><% } %>
       </p>
 
       <ul class="search-results">
@@ -54,4 +56,4 @@
   </div>
 </div>
 
-<%- include('partials/footer') %>
+<%- include('partials/footer', { pageScript: '/js/repo.js' }) %>

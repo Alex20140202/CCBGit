@@ -1,7 +1,9 @@
 <%- include('partials/header') %>
 
 <div class="repo-layout">
-  <div class="repo-main wide">
+  <%- include('partials/sidebar', { repo, ref, refEncoded, mode: 'blob' }) %>
+
+  <div class="repo-main">
     <%- include('partials/breadcrumbs', { repo, ref, refEncoded, path: filePath }) %>
 
     <div class="page-head compact">
@@ -59,5 +61,4 @@
   </div>
 </div>
 
-<% pageScript = '/js/editor.js' %>
-<%- include('partials/footer') %>
+<%- include('partials/footer', { pageScript: '/js/editor.js' }) %>

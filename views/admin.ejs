@@ -42,15 +42,14 @@
               · template: <%- h.escapeHtml(request.template) %>
             </p>
 
+            <%# One form for both decisions: the note is typed once, and the
+                Reject button overrides the action with formaction. %>
             <form method="post" action="/admin/requests/<%- h.escapeHtml(request.id) %>/approve" class="decide-form">
               <input type="hidden" name="_csrf" value="<%= csrf %>">
-              <input type="text" name="note" maxlength="200" placeholder="Optional note to the requester">
+              <input type="text" name="note" maxlength="200" placeholder="Optional note to the requester (required to reject)">
               <button class="primary-button" type="submit">Approve &amp; create</button>
-            </form>
-            <form method="post" action="/admin/requests/<%- h.escapeHtml(request.id) %>/reject" class="decide-form">
-              <input type="hidden" name="_csrf" value="<%= csrf %>">
-              <input type="text" name="note" maxlength="200" placeholder="Reason (shown to the requester)">
-              <button class="danger-button" type="submit">Reject</button>
+              <button class="danger-button" type="submit"
+                      formaction="/admin/requests/<%- h.escapeHtml(request.id) %>/reject">Reject</button>
             </form>
           </li>
         <% }) %>

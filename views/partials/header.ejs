@@ -7,6 +7,8 @@
   <meta name="description" content="<%= (typeof meta !== 'undefined' && meta && meta.description) ? h.escapeHtml(meta.description) : site.tagline %>">
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <%# Not deferred: this has to run before the first paint. %>
+  <script src="/js/theme.js"></script>
   <% if (csrf) { %><meta name="csrf-token" content="<%= csrf %>"><% } %>
 </head>
 <body>
@@ -62,7 +64,18 @@
         <% } %>
         <a class="ghost-button" href="/api/status" title="Service status">status</a>
         <button class="icon-button" id="theme-toggle" type="button" title="Toggle theme" aria-label="Toggle colour theme">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"></path></svg>
+          <%# One icon per theme, shown by CSS from the [data-theme] on <html>. %>
+          <svg class="theme-icon theme-icon-light" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="4.2"></circle>
+            <path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"></path>
+          </svg>
+          <svg class="theme-icon theme-icon-dark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"></path>
+          </svg>
+          <svg class="theme-icon theme-icon-auto" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="8.5"></circle>
+            <path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor" stroke="none"></path>
+          </svg>
         </button>
       </div>
     </div>

@@ -3,18 +3,17 @@
   'use strict';
 
   const THEME_KEY = 'ccbgit:theme';
+  const THEMES = ['auto', 'light', 'dark'];
 
   /* ------------------------------------------------------------- theme */
 
+  /* The stored value is applied by /js/theme.js before first paint; here we only
+     need to keep localStorage and the document in step when the user changes
+     it. */
   const applyTheme = (theme) => {
     document.documentElement.setAttribute('data-theme', theme);
     try { localStorage.setItem(THEME_KEY, theme); } catch { /* private mode */ }
   };
-
-  const initialTheme = (() => {
-    try { return localStorage.getItem(THEME_KEY) || 'auto'; } catch { return 'auto'; }
-  })();
-  applyTheme(initialTheme);
 
   /** The toggle cycles auto -> light -> dark; reflect that in its tooltip. */
   const paintToggle = () => {
@@ -30,9 +29,8 @@
   document.addEventListener('click', (event) => {
     const toggle = event.target.closest('#theme-toggle');
     if (!toggle) return;
-    const order = ['auto', 'light', 'dark'];
     const current = document.documentElement.getAttribute('data-theme') || 'auto';
-    applyTheme(order[(order.indexOf(current) + 1) % order.length]);
+    applyTheme(THEMES[(THEMES.indexOf(current) + 1) % THEMES.length]);
     paintToggle();
   });
 

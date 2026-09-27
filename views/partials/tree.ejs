@@ -77,11 +77,10 @@
             <%= entry.name %>
             <% if (entry.isSymlink) { %><span class="tree-hint">link</span><% } %>
           </a>
-          <a class="tree-meta" href="/<%= repo.id %>/commits?ref=<%= refEncoded %>&path=<%= encodeURIComponent(entry.path) %>" title="History for <%= entry.name %>">history</a>
+          <a class="tree-meta" href="/<%= repo.id %>/commits?ref=<%= refEncoded %>&path=<%= encodeURIComponent(entry.path) %>" title="History for <%= h.escapeHtml(entry.name) %>">history</a>
         <% } %>
-        <span class="tree-commit" title="Last change">
-          <%= entry.isDir ? '' : '' %>
-        </span>
+        <%# Filled in with the file size by public/js/repo.js; blank for a directory. %>
+        <span class="tree-commit"></span>
       </li>
     <% }) %>
   </ul>
