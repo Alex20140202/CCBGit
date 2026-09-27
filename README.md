@@ -30,6 +30,52 @@ npm start        # http://localhost:6600
 The first account you register becomes an administrator. Open
 `/register`, sign up, and you land on the admin page.
 
+## Getting content in
+
+**There is no web upload, and no HTTP git endpoint.** The site reads git's output;
+it is not a git remote, and it does not accept pushes over HTTP. The UI does not
+pretend otherwise — it shows the push command for the repository's location on
+disk rather than a `.git` URL that would fail.
+
+So the way to submit files is to push to the directory:
+
+```bash
+# a brand new repository
+git init --bare repos/my-project
+git clone repos/my-project my-project      # if you want to keep a working copy
+# ... or, from an existing checkout:
+cd ~/code/my-project
+git remote add ccbgit ~/Projects/CCBGit/repos/my-project
+git push ccbgit main
+```
+
+Then press **Rescan** on the home page (or wait out `CACHE_TTL`, 15s by
+default). The rescan clears the cached tree, blob and commit lookups, so new
+commits appear immediately.
+
+Two things worth knowing:
+
+- **A worktree repository refuses pushes to its checked-out branch.** That is
+  git's rule, not this site's: it would leave the working tree inconsistent with
+  `HEAD`. Either set `receive.denyCurrentBranch=updateInstead` on the
+  repository, or make it bare with `git init --bare`. Bare repositories are
+  indexed and browsed like any other.
+- **The three seeded repositories and the ones created through the approval
+  flow are worktrees**, so they need the `updateInstead` setting before you can
+  push to them.
+
+To get files *out*, use the tar.gz/zip download on any repository page, or read
+the files in the browser.
+
+### If you want real `git push` over HTTP
+
+That needs a git HTTP backend (`git http-backend`, or a server like
+`git-http-backend`/`go-git` in front of it), which means accepting unauthenticated
+or authenticated POST bodies that stream packfiles. It is a meaningful addition
+rather than a setting, and it changes the security model of the whole site — say
+the word and I will add it, but it deserves its own design discussion rather
+than being smuggled in.
+
 ## Access model
 
 The site is private: every page and every API endpoint requires a signed-in
@@ -84,6 +130,7 @@ administrator can then create further accounts.
 - Markdown files rendered to HTML, with hover permalinks on headings and a
   table of contents for long documents
 - Raw file download and `tar.gz` / `zip` archive of any ref
+- Bare and worktree repositories are both indexed
 
 **History**
 
@@ -122,7 +169,6 @@ to touch:
 | ----------- | -------------- | --------------------------------------------- |
 | `PORT`      | `6666`         | Listen port                                    |
 | `REPO_ROOTS`| `./repos`      | Directories to scan; the first is also where new repositories are created |
-| `BASE_URL`  | —              | Public URL, used to build the clone URLs shown |
 | `DATA_DIR`  | `./data`       | User accounts, request queue, session key      |
 | `ALLOW_SIGNUP` | `true`      | Set false to close registration                 |
 | `MAX_BLOB_SIZE` | `2097152`  | Largest file previewed in the browser          |

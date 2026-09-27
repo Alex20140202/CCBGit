@@ -54,6 +54,9 @@ router.get('/repos', wrap(async (req, res) => {
 
 router.post('/repos/refresh', wrap(async (_req, res) => {
   const repos = await registry.scan();
+  // The registry rebuild alone would leave every cached tree, blob and commit
+  // pointing at the previous state of the repository.
+  repo.invalidateAll();
   res.json({ ok: true, count: repos.total, names: repos.all });
 }));
 

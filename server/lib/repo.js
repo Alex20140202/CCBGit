@@ -4,6 +4,7 @@ import config from '../../config.js';
 import { GitError, git, gitBuffer, gitLines, gitOut, currentBranch, resolveCommit, descriptionOf } from './git.js';
 import { TtlCache } from './cache.js';
 import { sniff } from './render.js';
+import { looksBinary } from './binary.js';
 import {
   NotFoundError,
   ValidationError,
@@ -28,6 +29,17 @@ function invalidationKey(repo) {
 /** Drop cached data for a repository (used by the refresh endpoint). */
 export function invalidate(repo) {
   cache.invalidate(invalidationKey(repo));
+}
+
+/**
+ * Drop every cached lookup.
+ *
+ * A rescan has to call this: `registry.scan()` only rebuilds the repository
+ * list, so without it a freshly pushed commit stays invisible until the TTL
+ * expires - which makes the "Rescan" button silently do nothing.
+ */
+export function invalidateAll() {
+  cache.clear();
 }
 
 /* ------------------------------------------------------------------ refs */
@@ -160,25 +172,18 @@ export async function repoMeta(repo) {
   });
 }
 
-/** ssh/http/ssh+git clone URLs for this repository. */
+/**
+ * How to get content in and out.
+ *
+ * There is no git HTTP backend, so an `http://…/<owner>/<name>.git` URL would
+ * be a lie: git would follow it to the sign-in form and fail. What is true is
+ * the path on disk, which is what `git push` needs.
+ */
 export function cloneUrls(repo, meta = {}) {
-  const base = config.baseUrl || `http://localhost:${config.port}`;
-  const owner = repo.owner;
-  const name = repo.name;
-  const selfUrl = `${base}/${owner}/${name}.git`;
   return {
-    https: selfUrl,
-    ssh: `ssh://git@${hostOf(base)}/${owner}/${name}.git`,
+    local: repo.path,
     upstream: meta.remote || null,
   };
-}
-
-function hostOf(base) {
-  try {
-    return new URL(base).host;
-  } catch {
-    return 'localhost';
-  }
 }
 
 async function statsFor(repo) {
@@ -455,15 +460,6 @@ export async function blob(repo, ref, filePath) {
   });
 }
 
-function looksBinary(buffer) {
-  const sample = buffer.subarray(0, 8000);
-  if (sample.includes(0)) return true;
-  let suspicious = 0;
-  for (const byte of sample) {
-    if (byte < 9 || (byte > 13 && byte < 32)) suspicious += 1;
-  }
-  return sample.length > 0 && suspicious / sample.length > 0.3;
-}
 
 /* --------------------------------------------------------------- commits */
 

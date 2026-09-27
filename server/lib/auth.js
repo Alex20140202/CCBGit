@@ -337,6 +337,75 @@ export function newCsrfToken() {
   return crypto.randomBytes(24).toString('base64url');
 }
 
+/* -------------------------------------------------------- basic auth */
+
+/**
+ * Extract credentials from an `Authorization: Basic` header.
+ *
+ * git cannot follow a redirect to a sign-in form, so it needs to authenticate
+ * on the request itself. Basic is the mechanism git speaks out of the box,
+ * over a credential helper or `http.extraHeader`.
+ *
+ * @returns {{username: string, password: string} | null}
+ */
+export function parseBasicAuth(req) {
+  const header = req.headers.authorization;
+  if (!header || !/^basic\s/i.test(header)) return null;
+
+  let decoded;
+  try {
+    decoded = Buffer.from(header.replace(/^basic\s+/i, ''), 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+
+  const index = decoded.indexOf(':');
+  if (index === -1) return null;
+
+  return {
+    username: decoded.slice(0, index),
+    password: decoded.slice(index + 1),
+  };
+}
+
+/**
+ * Authenticate a request that carries Basic credentials, and remember the
+ * result for the rest of the request.
+ *
+ * Failures are counted against the same throttle as the sign-in form, so this
+ * cannot be used to guess passwords through git any more easily than through
+ * the browser.
+ */
+export async function attachBasicAuth(req, res, next) {
+  const credentials = parseBasicAuth(req);
+  if (!credentials) return next();
+
+  const throttle = loginThrottle(req, credentials.username);
+  if (!throttle.allowed) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="CCBGit", charset="UTF-8"');
+    res.setHeader('Retry-After', String(throttle.retryInMinutes * 60));
+    return res.status(429).end('Too many failed authentication attempts. Try again later.\n');
+  }
+
+  const user = await findUser(credentials.username);
+  const ok = user
+    ? verifyPassword(credentials.password, user.password)
+    : verifyPassword(credentials.password, 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAA');
+
+  if (!user || !ok) {
+    // Re-challenging is how git learns to prompt for credentials.
+    res.setHeader('WWW-Authenticate', 'Basic realm="CCBGit", charset="UTF-8"');
+    return res.status(401).end('Authentication required.\n');
+  }
+
+  clearLoginThrottle(req, credentials.username);
+  req.user = user;
+  if (!req.session) {
+    req.session = { sub: user.username, role: user.role, csrf: newCsrfToken() };
+  }
+  return next();
+}
+
 /* ------------------------------------------------------ login throttling */
 
 const attempts = new Map();

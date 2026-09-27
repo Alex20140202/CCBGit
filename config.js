@@ -34,9 +34,6 @@ export const config = {
     .map((entry) => path.resolve(entry.trim()))
     .filter(Boolean),
 
-  /** Public base URL used when rendering clone URLs. */
-  baseUrl: process.env.BASE_URL || '',
-
   site: {
     title: process.env.SITE_TITLE || 'CCBGit',
     tagline: process.env.SITE_TAGLINE || 'A home for every repository on this machine.',

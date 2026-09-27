@@ -93,24 +93,6 @@
     return ok;
   }
 
-  /* ------------------------------------------------------ clone tabs */
-
-  document.addEventListener('click', (event) => {
-    const tab = event.target.closest('.clone-tab');
-    if (!tab) return;
-    const form = tab.closest('.clone-form');
-    const input = form && form.querySelector('.clone-input');
-    if (!input) return;
-
-    let urls = {};
-    try { urls = JSON.parse(input.getAttribute('data-urls') || '{}'); } catch { urls = {}; }
-
-    for (const button of form.querySelectorAll('.clone-tab')) {
-      button.classList.toggle('is-active', button === tab);
-    }
-    if (urls[tab.dataset.protocol]) input.value = urls[tab.dataset.protocol];
-  });
-
   /* -------------------------------------------------- misc affordances */
 
   /* The account menu is a <details>, which has no outside-click dismissal of

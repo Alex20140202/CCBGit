@@ -167,9 +167,11 @@ describe('repository pages', () => {
     assert.match(response.headers.get('location'), /\/blob\/main\/README\.md$/);
   });
 
-  test('clone urls are shown', async () => {
+  test('the push command points at the directory on disk', async () => {
     const body = await text(REPO);
-    assert.match(body, /acme\/widget\.git/);
+    assert.match(body, /git push [^<]*acme[/\\]widget/);
+    // The site must not advertise an HTTP git endpoint it does not serve.
+    assert.equal(/acme\/widget\.git/.test(body), false);
   });
 });
 
@@ -267,12 +269,13 @@ describe('api', () => {
     assert.match(data.git, /git version/);
   });
 
-  test('metadata includes clone urls and counts', async () => {
-    const data = await json(`/api/repos/acme/widget`);
+  test('metadata includes the on-disk path and commit counts', async () => {
+    const data = await json('/api/repos/acme/widget');
     assert.equal(data.meta.commitCount, 2);
     assert.equal(data.meta.branchCount, 2);
     assert.equal(data.meta.tagCount, 1);
-    assert.match(data.meta.cloneUrls.https, /acme\/widget\.git$/);
+    // The push target is the directory on disk, not an HTTP git endpoint.
+    assert.match(data.meta.cloneUrls.local, /acme\/widget$/);
   });
 
   test('refs', async () => {
@@ -399,6 +402,81 @@ describe('hostile input', () => {
     assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN');
     assert.match(response.headers.get('content-security-policy'), /script-src 'self'/);
     assert.equal(response.headers.get('x-powered-by'), null);
+  });
+});
+
+describe('bare repositories', () => {
+  test('a bare repository is indexed and browsable', async () => {
+    // git refuses to push into a checked-out branch, so a bare repository is
+    // the only layout you can actually push to. It has no .git directory, which
+    // is why discovery has to recognise the HEAD/objects/refs layout.
+    const bare = path.join(tmp, 'acme', 'pushed');
+    fs.mkdirSync(bare, { recursive: true });
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare]);
+
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ccbgit-push-'));
+    execFileSync('git', ['init', '-q', '-b', 'main', scratch]);
+    fs.writeFileSync(path.join(scratch, 'README.md'), '# Pushed\n\nFrom a real push.\n');
+    execFileSync('git', ['add', '-A'], { cwd: scratch });
+    execFileSync('git', [
+      '-c', 'user.name=Push', '-c', 'user.email=push@example.com',
+      'commit', '-q', '-m', 'pushed a file',
+    ], { cwd: scratch });
+    execFileSync('git', ['push', '-q', bare, 'main'], { cwd: scratch });
+
+    const csrf = await readCsrf('/');
+    const refreshed = await rawRequest('POST', '/api/repos/refresh', undefined, { 'x-csrf-token': csrf });
+    assert.equal(refreshed.status, 200);
+    assert.ok(
+      (await refreshed.json()).names.some((entry) => entry.name === 'pushed'),
+      'the bare repository should appear in the index',
+    );
+
+    const meta = await json('/api/repos/acme/pushed/meta');
+    assert.equal(meta.bare, true);
+
+    assert.equal((await get('/acme/pushed')).status, 200);
+    const blob = await json('/api/repos/acme/pushed/blob?ref=main&path=README.md');
+    assert.match(blob.content, /From a real push/);
+
+    fs.rmSync(scratch, { recursive: true, force: true });
+  });
+
+  test('a rescan surfaces content pushed since the last read', async () => {
+    // The rescan used to rebuild the repository list but leave every cached
+    // tree and blob pointing at the previous state, so the button did nothing
+    // until the TTL expired. The suite runs with CACHE_TTL=0, so this asserts
+    // that refresh() is what makes new state visible.
+    const target = path.join(tmp, 'acme', 'widget');
+    const before = await json('/api/repos/acme/widget/commits?ref=main');
+
+    // Clone first: pushing unrelated history would be rejected as
+    // non-fast-forward. The target is a worktree repository, so git refuses to
+    // update the branch it has checked out unless this is set - the same
+    // setting a real deployment needs.
+    execFileSync('git', ['config', 'receive.denyCurrentBranch', 'updateInstead'], { cwd: target });
+
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ccbgit-rescan-'));
+    execFileSync('git', ['clone', '-q', target, scratch]);
+    execFileSync('git', ['config', 'user.name', 'Push'], { cwd: scratch });
+    execFileSync('git', ['config', 'user.email', 'push@example.com'], { cwd: scratch });
+    fs.writeFileSync(path.join(scratch, 'added.md'), '# Added later\n');
+    execFileSync('git', ['add', '-A'], { cwd: scratch });
+    execFileSync('git', ['commit', '-q', '-m', 'a brand new commit'], { cwd: scratch });
+    execFileSync('git', ['push', '-q', 'origin', 'main'], { cwd: scratch });
+
+    const csrf = await readCsrf('/');
+    const refreshed = await rawRequest('POST', '/api/repos/refresh', undefined, { 'x-csrf-token': csrf });
+    assert.equal(refreshed.status, 200);
+
+    const after = await json('/api/repos/acme/widget/commits?ref=main');
+    assert.equal(after.items.length, before.items.length + 1);
+    assert.equal(after.items[0].subject, 'a brand new commit');
+
+    const blob = await json('/api/repos/acme/widget/blob?ref=main&path=added.md');
+    assert.match(blob.content, /Added later/);
+
+    fs.rmSync(scratch, { recursive: true, force: true });
   });
 });
 

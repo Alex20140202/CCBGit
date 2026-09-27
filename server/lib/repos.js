@@ -27,18 +27,10 @@ function key(owner, name) {
 async function discover(dir, depth, seen, out) {
   if (depth > 3) return;
 
-  let entries;
-  try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
+  const entries = await safeReaddir(dir);
+  if (!entries) return;
 
-  const hasGitDir = entries.some(
-    (entry) => entry.name === '.git' && (entry.isDirectory() || entry.isFile()),
-  );
-
-  if (hasGitDir) {
+  if (await isRepository(dir)) {
     out.push(dir);
     // Do not recurse into a repository: nested repos are not hosted here.
     return;
@@ -49,7 +41,20 @@ async function discover(dir, depth, seen, out) {
     if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'repos') {
       continue;
     }
+    // Directories that belong to a repository, not to the tree we are scanning.
+    if (SKIP_INSIDE_REPO.has(entry.name)) continue;
     await discover(path.join(dir, entry.name), depth + 1, seen, out);
+  }
+}
+
+const SKIP_INSIDE_REPO = new Set(['hooks', 'objects', 'refs', 'info', 'branches', 'logs', 'worktrees']);
+
+/** `readdir` that reports failure as null instead of throwing. */
+async function safeReaddir(dir) {
+  try {
+    return await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return null;
   }
 }
 

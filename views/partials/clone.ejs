@@ -1,24 +1,35 @@
-<%
-  const treeUrl = (relPath) => `/${repo.id}/tree/${refEncoded}/${relPath}`;
-  const blobUrl = (relPath) => `/${repo.id}/blob/${refEncoded}/${relPath}`;
+<%#
+  Only advertise commands that actually work. `owner/name.git` is a browse
+  path, not a git endpoint: there is no git HTTP backend here, so `git clone`
+  or `git push` over HTTP would just be redirected to the sign-in form.
+
+  What does work is pushing to the repository's location on disk, and
+  downloading a snapshot of any ref as an archive.
 %>
-<form class="clone-form" data-clone-form>
-  <input type="hidden" name="ref" value="<%= ref %>">
+<div class="clone-form">
   <div class="clone-tabs" role="tablist">
-    <button type="button" class="clone-tab is-active" data-protocol="https" role="tab">HTTPS</button>
-    <button type="button" class="clone-tab" data-protocol="ssh" role="tab">SSH</button>
+    <span class="clone-tab is-active">Push from your machine</span>
   </div>
   <div class="clone-row">
     <input class="clone-input" id="clone-url" readonly spellcheck="false"
-           value="<%= meta.cloneUrls.https %>"
-           aria-label="Clone URL"
-           data-urls='<%= h.json(meta.cloneUrls) %>'>
-    <button type="button" class="clone-copy" data-copy-target="#clone-url" title="Copy clone URL">
+           value="git push <%= h.escapeHtml(meta.cloneUrls.local) %> <%= h.escapeHtml(ref) %>"
+           aria-label="Push command">
+    <button type="button" class="clone-copy" data-copy-target="#clone-url" title="Copy push command">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>
       <span>Copy</span>
     </button>
-    <a class="archive-button" href="/<%= repo.id %>/archive/tar.gz?ref=<%= refEncoded %>" title="Download tar.gz">
+    <a class="archive-button" href="/<%= repo.id %>/archive/tar.gz?ref=<%= refEncoded %>" title="Download this ref as tar.gz">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"></path></svg>
+      <span class="sr-only">Download tar.gz</span>
     </a>
   </div>
-</form>
+  <p class="clone-note">
+    This is a repository on disk, not an HTTP git endpoint &mdash; push to the
+    path above, then use <strong>Rescan</strong> on the home page.
+    <% if (!meta.bare) { %>
+      A worktree repository refuses pushes to the branch it has checked out; set
+      <code>receive.denyCurrentBranch=updateInstead</code> first, or make the
+      repository bare with <code>git init --bare</code>.
+    <% } %>
+  </p>
+</div>
