@@ -32,14 +32,20 @@ function resolveRepo(req) {
 
 const CHALLENGE = `Authentication required.
 
-git needs credentials over HTTP. Either configure a helper:
+git speaks HTTP Basic auth and cannot reuse a browser session, so it needs the
+account name and password you sign in to this site with:
 
-  git config --global credential.helper store
   git clone http://localhost:${config.port}/<owner>/<repo>.git
 
-and answer the prompt, or put them in the URL:
+Answer the prompt once; the helper configured for your platform (on macOS,
+osxkeychain) will remember it. In a script there is nobody to answer, so the
+credentials have to be supplied explicitly - an askpass helper is better than a
+password in the URL, which lands in .git/config:
 
-  git clone http://<username>:<password>@localhost:${config.port}/<owner>/<repo>.git
+  GIT_ASKPASS=/path/to/helper GIT_TERMINAL_PROMPT=0 git push http://localhost:${config.port}/<owner>/<repo>.git
+
+Failed attempts are rate limited: after a few, this endpoint answers 429 for 15
+minutes.
 `;
 
 /** Any signed-in user may read. */

@@ -96,9 +96,6 @@
 
   const diffs = document.querySelectorAll('.diff-file');
   if (diffs.length > 1) {
-    const bar = document.createElement('div');
-    bar.className = 'diff-summary';
-
     const makeButton = (label, open) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -110,9 +107,20 @@
       return button;
     };
 
-    bar.appendChild(makeButton('Expand all', true));
-    bar.appendChild(makeButton('Collapse all', false));
-    diffs[0].before(bar);
+    const group = document.createElement('span');
+    group.className = 'diff-toggle';
+    group.append(makeButton('Expand all', true), makeButton('Collapse all', false));
+
+    // The view already renders a summary bar with the add/delete counts, so the
+    // controls join it rather than stacking a second bar on top of it.
+    const bar = document.querySelector('.diff-summary');
+    if (bar) bar.appendChild(group);
+    else {
+      const created = document.createElement('div');
+      created.className = 'diff-summary';
+      created.appendChild(group);
+      diffs[0].before(created);
+    }
   }
 
   /* ------------------------------------------- file sizes in the tree */

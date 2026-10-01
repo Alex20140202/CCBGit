@@ -24,15 +24,21 @@
 
   <% if (writeAccess.canWrite) { %>
     <p class="clone-note">
-      You can push here. Authenticate once with
-      <code>git config credential.helper store</code>, then
-      <code>git push <%= h.escapeHtml(git.short) %> <%= h.escapeHtml(ref) %></code>.
+      You can push here. Git cannot reuse your browser session, so it asks for
+      credentials of its own &mdash; give it the same username and password you
+      sign in to this site with. macOS then keeps them in the keychain and later
+      pushes are silent:
+      <code>git push <%= h.escapeHtml(git.short) %> <%= h.escapeHtml(ref) %></code>
+      <br>A script has nobody to answer that prompt, so it has to carry the
+      credentials in the URL or a helper:
+      <code>http://user:pass@host/<%= h.escapeHtml(git.short) %>.git</code>
     </p>
   <% } else { %>
     <p class="clone-note">
       Read-only for you<% if (writeAccess.owner && !writeAccess.owner.includes(':')) { %>
         &mdash; owned by <strong><%= h.escapeHtml(writeAccess.owner) %></strong><% } %>.
-      You can still add files from this machine:
+      A push over this URL is refused before any data is sent. From a checkout
+      on this machine you can still add files:
       <code>git push <%= h.escapeHtml(git.path) %> <%= h.escapeHtml(ref) %></code>
     </p>
   <% } %>

@@ -4,8 +4,9 @@
   const scopeParam = scopePath ? '&path=' + encodeURIComponent(scopePath) : '';
 
   // A blob belongs under Code, and a single commit under Commits, so neither
-  // view may leave the navigation with nothing highlighted.
-  const onCode = mode === 'tree' || mode === 'blob';
+  // view may leave the navigation with nothing highlighted. Compare and the
+  // editor are file-level views too, so they count as Code.
+  const onCode = ['tree', 'blob', 'compare', 'edit', 'create'].includes(mode);
   const onCommits = mode === 'commits' || mode === 'commit';
   const onSearch = mode === 'search';
 %>

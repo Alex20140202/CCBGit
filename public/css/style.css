@@ -205,6 +205,7 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
   width: 32px; height: 32px; padding: 0;
   background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
   color: var(--text-muted); cursor: pointer;
+  transition: background .12s ease, color .12s ease;
 }
 .icon-button:hover { background: var(--bg-subtle); color: var(--text); }
 .icon-button svg { width: 17px; height: 17px; fill: currentColor; stroke: none; }
@@ -423,8 +424,10 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .side-ref.is-current { color: var(--accent); font-weight: 550; }
 .ref-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.lang-block { margin-bottom: 18px; padding: 0 10px; }
-.lang-list { list-style: none; margin: 9px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+/* The stack above the bar is the branches list, which is flush with the nav;
+   a small top inset keeps the bar from reading as part of it. */
+.lang-block { margin-bottom: 18px; padding: 4px 10px 0; }
+.lang-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .lang-list li { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
 .swatch { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
 .lang-name { color: var(--text-muted); }
@@ -455,7 +458,7 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 
 .breadcrumbs {
   display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
-  margin-bottom: 12px; font-size: 15px;
+  margin-bottom: 16px; font-size: 15px;
 }
 .crumb { color: var(--accent); }
 .crumb.current { color: var(--text); font-weight: 600; }
@@ -465,7 +468,7 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 
 /* --------------------------------------------------------------- clone */
 
-.clone-form { margin-bottom: 14px; }
+.clone-form { margin-bottom: 16px; }
 .clone-tabs { display: flex; gap: 2px; margin-bottom: -1px; position: relative; z-index: 1; }
 .clone-tab {
   padding: 5px 14px; font: inherit; font-size: 12.5px;
@@ -484,11 +487,12 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .clone-copy { flex-shrink: 0; }
 .clone-copy svg { width: 15px; height: 15px; }
 .clone-copy.is-done { color: var(--add); border-color: var(--add); }
-.clone-note { margin: 7px 0 0; font-size: 12px; color: var(--text-faint); line-height: 1.5; }
+.clone-note { margin: 10px 0 0; font-size: 12px; color: var(--text-faint); line-height: 1.6; }
+/* No border here: inline code in running text is a tint, not a box. The bordered
+   treatment is reserved for code inside a rendered README. */
 .clone-note code {
   font-family: var(--font-mono); font-size: 11.5px;
-  background: var(--bg-subtle); border: 1px solid var(--border);
-  padding: .1em .3em; border-radius: 4px;
+  background: var(--bg-subtle); padding: .1em .35em; border-radius: 4px;
 }
 
 /* -------------------------------------------------------- commit strip */
@@ -643,11 +647,12 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 /* ----------------------------------------------------------------- diff */
 
 .diff-summary {
-  display: flex; align-items: center; padding: 10px 16px;
+  display: flex; align-items: center; flex-wrap: wrap; padding: 10px 16px;
   border-bottom: 1px solid var(--border); background: var(--bg-subtle);
   font-size: 13px; color: var(--text-muted);
 }
 .diff-stat b.add { color: var(--add); } .diff-stat b.del { color: var(--del); }
+.diff-toggle { margin-left: auto; display: flex; gap: 7px; }
 
 .diff-file { border-bottom: 1px solid var(--border); }
 .diff-file:last-child { border-bottom: 0; }
@@ -946,18 +951,40 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .action-edit { color: var(--accent); border-color: var(--accent); }
 .inline-form { display: inline-flex; margin: 0; }
 
-.upload-panel { padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--bg-subtle); }
+/* The panel is a bare <form>, so it does not inherit the vertical rhythm from
+   `.form`; without this the commit message field sits flush against the button
+   row. Same column + gap as the editor form it mirrors. */
+.upload-panel {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--bg-subtle);
+}
 .upload-drop {
-  display: flex; align-items: center; justify-content: center;
-  min-height: 76px; padding: 14px;
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  min-height: 96px; padding: 14px;
   border: 1.5px dashed var(--border-strong); border-radius: var(--radius);
   background: var(--bg-elevated); cursor: pointer; color: var(--text-muted);
   font-size: 13px; text-align: center; transition: border-color .12s ease, background .12s ease;
 }
 .upload-drop:hover, .upload-drop.is-over { border-color: var(--accent); background: var(--accent-soft); }
-.upload-drop input[type="file"] { max-width: 100%; font-size: 12.5px; }
+/* The native control is kept in the DOM (so the form still submits, and the
+   drop handler still has something to write `files` to) but stretched over the
+   zone and made invisible. The browser's own "Choose File / No file chosen"
+   chrome is locale-dependent, which is why it is never shown. */
+.upload-drop input[type="file"] {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer;
+}
+.upload-drop:focus-within { border-color: var(--accent); background: var(--accent-soft); }
+.upload-icon { display: inline-flex; color: var(--text-faint); transition: color .12s ease; }
+.upload-icon svg { width: 21px; height: 21px; }
+.upload-drop:hover .upload-icon, .upload-drop.is-over .upload-icon, .upload-drop:focus-within .upload-icon { color: var(--accent); }
+.upload-hint { display: block; }
+.upload-hint strong { color: var(--text); font-weight: 600; }
+.upload-sub { display: block; margin-top: 2px; font-size: 12px; color: var(--text-faint); }
 
-.upload-list { margin: 10px 0; display: flex; flex-direction: column; gap: 5px; }
+/* Spacing above and below the list comes from the panel's own gap. */
+.upload-list { margin: 0; display: flex; flex-direction: column; gap: 5px; }
 .upload-list:empty { display: none; }
 .upload-item {
   display: flex; align-items: center; gap: 9px;
@@ -968,6 +995,15 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .upload-item .name { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .upload-item .size { margin-left: auto; color: var(--text-faint); white-space: nowrap; }
 .upload-item.is-too-big { border-color: var(--del); color: var(--del); }
+/* Drop one staged file without re-picking the whole set. */
+.upload-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; padding: 0; flex-shrink: 0;
+  background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+  color: var(--text-faint); cursor: pointer; transition: color .12s ease, background .12s ease;
+}
+.upload-remove svg { width: 13px; height: 13px; }
+.upload-remove:hover { background: var(--del-bg); color: var(--del); }
 
 .editor-form { display: flex; flex-direction: column; gap: 14px; }
 .editor-head {

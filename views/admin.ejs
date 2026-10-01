@@ -46,7 +46,7 @@
                 Reject button overrides the action with formaction. %>
             <form method="post" action="/admin/requests/<%- h.escapeHtml(request.id) %>/approve" class="decide-form">
               <input type="hidden" name="_csrf" value="<%= csrf %>">
-              <input type="text" name="note" maxlength="200" placeholder="Optional note to the requester (required to reject)">
+              <input type="text" name="note" maxlength="200" placeholder="Optional note to the requester">
               <button class="primary-button" type="submit">Approve &amp; create</button>
               <button class="danger-button" type="submit"
                       formaction="/admin/requests/<%- h.escapeHtml(request.id) %>/reject">Reject</button>

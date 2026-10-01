@@ -34,11 +34,22 @@
   const drop = document.querySelector('.upload-drop');
 
   if (fileInput && list) {
-    const render = () => {
-      const files = [...fileInput.files];
-      list.replaceChildren(...files.map((file) => {
+    /* A <input type="file"> cannot be edited once chosen: the only way to drop
+       one staged file is to rebuild the whole FileList from a DataTransfer, so
+       the accepted set is mirrored here and pushed back on every change. */
+    let accepted = [];
+
+    const pushToInput = () => {
+      const transfer = new DataTransfer();
+      for (const file of accepted) transfer.items.add(file);
+      fileInput.files = transfer.files;
+    };
+
+    const paint = () => {
+      list.replaceChildren(...accepted.map((file, index) => {
         const row = document.createElement('div');
-        row.className = `upload-item${file.size > MAX_BYTES ? ' is-too-big' : ''}`;
+        const tooBig = file.size > MAX_BYTES;
+        row.className = `upload-item${tooBig ? ' is-too-big' : ''}`;
 
         const name = document.createElement('span');
         name.className = 'name';
@@ -46,16 +57,36 @@
 
         const size = document.createElement('span');
         size.className = 'size';
-        size.textContent = file.size > MAX_BYTES
-          ? `${humanSize(file.size)} — too large`
-          : humanSize(file.size);
+        size.textContent = tooBig ? `${humanSize(file.size)} — too large` : humanSize(file.size);
 
-        row.append(name, size);
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'upload-remove';
+        remove.dataset.uploadRemove = String(index);
+        remove.title = `Remove ${file.name}`;
+        remove.setAttribute('aria-label', `Remove ${file.name}`);
+        remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>';
+
+        row.append(name, size, remove);
         return row;
       }));
     };
 
-    fileInput.addEventListener('change', render);
+    const accept = (files) => {
+      accepted = [...files];
+      paint();
+      pushToInput();
+    };
+
+    list.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-upload-remove]');
+      if (!button) return;
+      accepted.splice(Number(button.dataset.uploadRemove), 1);
+      paint();
+      pushToInput();
+    });
+
+    fileInput.addEventListener('change', () => accept(fileInput.files));
 
     if (drop) {
       const over = (on) => drop.classList.toggle('is-over', on);
@@ -67,12 +98,7 @@
       drop.addEventListener('drop', (event) => {
         const dropped = event.dataTransfer && event.dataTransfer.files;
         if (!dropped || !dropped.length) return;
-        // Assigning to DataTransfer.files is the only way to make dropped
-        // files appear in the input so they get submitted.
-        const transfer = new DataTransfer();
-        for (const file of dropped) transfer.items.add(file);
-        fileInput.files = transfer.files;
-        render();
+        accept(dropped);
       });
     }
   }

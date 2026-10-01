@@ -28,16 +28,23 @@
 
       <label class="upload-drop">
         <input type="file" name="files" multiple required>
-        <span>Choose files, or drop them here</span>
+        <span class="upload-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 16V5m0 0-4 4m4-4 4 4M4 18v1a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1"></path></svg>
+        </span>
+        <span class="upload-hint">
+          <strong>Choose files</strong> or drop them here
+          <span class="upload-sub">Up to 5 MB each</span>
+        </span>
       </label>
 
       <div class="upload-list" data-upload-list></div>
 
       <label class="field">
         <span>Commit message</span>
+        <%# A placeholder, not a value: a pre-filled message is a commit
+            message somebody forgot to write. %>
         <input type="text" name="message" required maxlength="500"
-               value="Add files to <%= h.escapeHtml(path || '.') %>"
-               placeholder="Describe the change">
+               placeholder="Add files to <%= h.escapeHtml(path || 'the repository root') %>">
       </label>
 
       <div class="editor-actions">
